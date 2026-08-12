@@ -2,7 +2,9 @@
 
 Frontend website to graph and explore Phoenician Capital infrastructure.
 
-Static client-side app hosted on AWS Amplify. Pushes to `main` trigger a new deploy.
+Static client-side app hosted on **AWS Amplify** (`eu-north-1`). Every push to `main` runs GitHub Actions → build → Amplify deploy.
+
+**Live:** https://main.d3w0s20ak7lflk.amplifyapp.com
 
 ## Local
 
@@ -13,4 +15,4 @@ npm run dev
 
 ## Note
 
-Local reference folders (`Earnings_tracker`, `phoenician-*`, etc.) are gitignored and never deployed.
+Local reference folders (`Earnings_tracker`, `phoenician-*`, etc.) are gitignored and never pushed or deployed.

@@ -1,0 +1,145 @@
+# Build the Vite frontend and deploy to Amplify Hosting via the manual
+# deployment API (same pattern as phoenician-portfolio — no Amplify↔GitHub
+# deploy-key connection required).
+#
+# GitHub repo variables (Settings → Secrets and variables → Actions):
+#   AWS_REGION, AMPLIFY_APP_ID, AMPLIFY_BRANCH
+# Auth: OIDC → IAM role github-actions-deploy (trusted for phoenician-capital/*)
+
+name: Deploy frontend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-frontend-main
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::578736536410:role/github-actions-deploy
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload build to Amplify Hosting
+        env:
+          APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+          BRANCH: ${{ vars.AMPLIFY_BRANCH }}
+        run: |
+          set -euo pipefail
+          if [ -z "$APP_ID" ] || [ -z "$BRANCH" ]; then
+            echo "Set AMPLIFY_APP_ID and AMPLIFY_BRANCH in GitHub Actions variables."
+            exit 1
+          fi
+
+          wait_amplify_idle() {
+            for _ in $(seq 1 48); do
+              STATUSES=$(aws amplify list-jobs \
+                --app-id "$APP_ID" \
+                --branch-name "$BRANCH" \
+                --max-items 5 \
+                --query 'jobSummaries[*].status' \
+                --output text 2>/dev/null || echo "")
+              echo "  recent_job_statuses=${STATUSES:-NONE}"
+              if printf '%s' "$STATUSES" | grep -qE 'RUNNING|PENDING|PROVISIONING'; then
+                sleep 10
+                continue
+              fi
+              return 0
+            done
+            echo "Timed out waiting for in-flight Amplify jobs to finish"
+            return 1
+          }
+
+          echo "Waiting for any in-flight Amplify job on ${BRANCH}..."
+          wait_amplify_idle
+
+          (cd dist && zip -qr ../artifacts.zip .)
+
+          DEPLOY=""
+          for attempt in $(seq 1 24); do
+            set +e
+            ERR_FILE=$(mktemp)
+            DEPLOY=$(aws amplify create-deployment \
+              --app-id "$APP_ID" \
+              --branch-name "$BRANCH" \
+              --output json 2>"$ERR_FILE")
+            RC=$?
+            set -e
+            if [ "$RC" -eq 0 ] && [ -n "$DEPLOY" ]; then
+              rm -f "$ERR_FILE"
+              break
+            fi
+            ERR=$(cat "$ERR_FILE" 2>/dev/null || true)
+            rm -f "$ERR_FILE"
+            echo "create-deployment attempt $attempt failed: $ERR"
+            if printf '%s' "$ERR" | grep -qiE 'not finished|BadRequestException|ConflictException'; then
+              wait_amplify_idle || sleep 15
+              continue
+            fi
+            echo "$ERR"
+            exit 1
+          done
+          if [ -z "$DEPLOY" ]; then
+            echo "Exhausted create-deployment retries"
+            exit 1
+          fi
+
+          JOB_ID=$(echo "$DEPLOY" | jq -r '.jobId')
+          UPLOAD_URL=$(echo "$DEPLOY" | jq -r '.zipUploadUrl')
+          curl -sf -T artifacts.zip "$UPLOAD_URL"
+
+          aws amplify start-deployment \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH" \
+            --job-id "$JOB_ID"
+
+          echo "Waiting for Amplify job $JOB_ID..."
+          for _ in $(seq 1 60); do
+            STATUS=$(aws amplify get-job \
+              --app-id "$APP_ID" \
+              --branch-name "$BRANCH" \
+              --job-id "$JOB_ID" \
+              --query 'job.summary.status' \
+              --output text)
+            echo "  status=$STATUS"
+            case "$STATUS" in
+              SUCCEED)
+                echo "Live at: https://${BRANCH}.${APP_ID}.amplifyapp.com"
+                exit 0
+                ;;
+              FAILED|CANCELLED)
+                aws amplify get-job \
+                  --app-id "$APP_ID" \
+                  --branch-name "$BRANCH" \
+                  --job-id "$JOB_ID" \
+                  --output json
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "Timed out waiting for Amplify deployment"
+          exit 1
