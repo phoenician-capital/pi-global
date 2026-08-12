@@ -1,0 +1,37 @@
+# Reference codebases — local only, never commit / never deploy via Amplify
+Earnings_tracker/
+Factsheet-Automation/
+Linker/
+investor-portal-backend/
+investor-portal-mobile/
+phoenician-intelligence/
+phoenician-intelligence-backend/
+phoenician-intelligence-frontend/
+phoenician-mail-sender/
+phoenician-portfolio/
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+*.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs / OS / IDE
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.amplify/
+amplifyconfiguration.json
