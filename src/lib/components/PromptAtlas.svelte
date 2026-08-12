@@ -39,9 +39,19 @@
   let ty = $state(0);
   let panning = $state(false);
   let panStart = $state({ x: 0, y: 0, tx: 0, ty: 0 });
+  /** Once the user zooms/pans, auto-fit on resize must not fight them (plain flag — not reactive). */
+  let userCamera = false;
 
+  const MIN_SCALE = 0.3;
+  const MAX_SCALE = 3.6;
   const W = promptMapWorld.w;
   const H = promptMapWorld.h;
+  const zoomPct = $derived(Math.round(scale * 100));
+
+  /** @param {number} s */
+  function clampScale(s) {
+    return Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+  }
 
   const projects = $derived(
     intelligenceProjects().map((p) => {
@@ -167,18 +177,31 @@
     const el = wrapEl;
     if (!el) return;
     const { width, height } = el.getBoundingClientRect();
-    const pad = 40;
-    const s = Math.min((width - pad) / W, (height - pad) / H, 1.1);
-    scale = Math.max(0.45, s);
+    if (width < 40 || height < 40) return;
+    const pad = 48;
+    const s = clampScale(Math.min((width - pad) / W, (height - pad) / H, 1.05));
+    scale = s;
     tx = (width - W * scale) / 2;
     ty = (height - H * scale) / 2;
+    userCamera = false;
   }
 
   $effect(() => {
     if (!wrapEl) return;
     fit();
-    const ro = new ResizeObserver(() => fit());
-    ro.observe(wrapEl);
+    const el = wrapEl;
+    let lastW = 0;
+    let lastH = 0;
+    const ro = new ResizeObserver(() => {
+      const { width, height } = el.getBoundingClientRect();
+      if (Math.abs(width - lastW) < 4 && Math.abs(height - lastH) < 4) return;
+      lastW = width;
+      lastH = height;
+      // Don't yank the camera after the user has zoomed/panned.
+      if (userCamera) return;
+      fit();
+    });
+    ro.observe(el);
     return () => ro.disconnect();
   });
 
@@ -186,6 +209,37 @@
   function pick(id) {
     onselect(id);
     layer = "constellation";
+  }
+
+  /**
+   * Zoom toward a point in the stage (client coords relative to wrap), or center.
+   * @param {number} factor
+   * @param {number} [mx]
+   * @param {number} [my]
+   */
+  function zoomAt(factor, mx, my) {
+    const el = wrapEl;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = mx ?? rect.width / 2;
+    const cy = my ?? rect.height / 2;
+    const before = scale;
+    const next = clampScale(scale * factor);
+    if (next === before) return;
+    const wx = (cx - tx) / before;
+    const wy = (cy - ty) / before;
+    scale = next;
+    tx = cx - wx * next;
+    ty = cy - wy * next;
+    userCamera = true;
+  }
+
+  function zoomIn() {
+    zoomAt(1.22);
+  }
+
+  function zoomOut() {
+    zoomAt(1 / 1.22);
   }
 
   /** @param {WheelEvent} ev */
@@ -196,18 +250,18 @@
     const rect = el.getBoundingClientRect();
     const mx = ev.clientX - rect.left;
     const my = ev.clientY - rect.top;
-    const before = scale;
-    const next = Math.min(1.8, Math.max(0.4, scale * (ev.deltaY > 0 ? 0.92 : 1.08)));
-    const wx = (mx - tx) / before;
-    const wy = (my - ty) / before;
-    scale = next;
-    tx = mx - wx * next;
-    ty = my - wy * next;
+    // Normalize mouse wheel vs trackpad pinches
+    let dy = ev.deltaY;
+    if (ev.deltaMode === 1) dy *= 16;
+    if (ev.deltaMode === 2) dy *= rect.height;
+    const intensity = Math.min(0.28, Math.abs(dy) / 420);
+    const factor = dy > 0 ? 1 - intensity * 0.55 : 1 + intensity * 0.65;
+    zoomAt(factor, mx, my);
   }
 
   /** @param {PointerEvent} ev */
   function onPointerDown(ev) {
-    if (/** @type {Element} */ (ev.target).closest?.("[data-node]")) return;
+    if (/** @type {Element} */ (ev.target).closest?.("[data-node], .zoom-pad")) return;
     panning = true;
     panStart = { x: ev.clientX, y: ev.clientY, tx, ty };
     wrapEl?.setPointerCapture(ev.pointerId);
@@ -218,10 +272,20 @@
     if (!panning) return;
     tx = panStart.tx + (ev.clientX - panStart.x);
     ty = panStart.ty + (ev.clientY - panStart.y);
+    userCamera = true;
   }
 
   function onPointerUp() {
     panning = false;
+  }
+
+  /** @param {MouseEvent} ev */
+  function onDblClick(ev) {
+    if (/** @type {Element} */ (ev.target).closest?.("[data-node], .zoom-pad, button")) return;
+    const el = wrapEl;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    zoomAt(ev.shiftKey ? 1 / 1.45 : 1.45, ev.clientX - rect.left, ev.clientY - rect.top);
   }
 
   /**
@@ -321,7 +385,6 @@
     <button type="button" class:on={layer === "models"} onclick={() => { layer = "models"; kindFocus = null; }}>
       Model providers
     </button>
-    <button type="button" class="ghost" onclick={fit}>Fit</button>
   </div>
 
   {#if layer === "kinds"}
@@ -352,7 +415,15 @@
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
     onpointercancel={onPointerUp}
+    ondblclick={onDblClick}
   >
+    <div class="zoom-pad" role="toolbar" aria-label="Zoom">
+      <button type="button" title="Zoom in (+)" aria-label="Zoom in" onclick={zoomIn}>+</button>
+      <button type="button" title="Zoom out (−)" aria-label="Zoom out" onclick={zoomOut}>−</button>
+      <button type="button" class="wide" title="Fit all" onclick={fit}>Fit</button>
+      <span class="pct" title="Current zoom">{zoomPct}%</span>
+    </div>
+
     <svg
       class="map"
       width={W}
@@ -518,7 +589,9 @@
       </div>
     {/if}
 
-    <p class="hint-bar">Drag to pan · scroll to zoom · click a product · use lenses above</p>
+    <p class="hint-bar">
+      Scroll / pinch to zoom · drag to pan · double-click zoom in (Shift = out) · +/− pad
+    </p>
   </div>
 
   {#if dossier && guide && active}
@@ -721,10 +794,6 @@
     font-weight: 560;
   }
 
-  .hud-layers .ghost {
-    margin-left: auto;
-  }
-
   .kind-lens {
     display: flex;
     flex-wrap: wrap;
@@ -770,15 +839,67 @@
     cursor: grab;
     overflow: hidden;
     touch-action: none;
+    overscroll-behavior: none;
   }
 
   .stage.grabbing {
     cursor: grabbing;
   }
 
+  .zoom-pad {
+    position: absolute;
+    z-index: 4;
+    left: 12px;
+    bottom: 36px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px;
+    border-radius: 12px;
+    background: rgba(255, 253, 248, 0.92);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 8px 22px rgba(28, 25, 20, 0.08);
+    backdrop-filter: blur(8px);
+  }
+
+  .zoom-pad button {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: #fffdf8;
+    color: var(--fg);
+    font-size: 1.1rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .zoom-pad button:hover {
+    border-color: rgba(47, 111, 138, 0.45);
+    background: rgba(47, 111, 138, 0.08);
+  }
+
+  .zoom-pad button.wide {
+    width: auto;
+    padding: 0 10px;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .zoom-pad .pct {
+    min-width: 42px;
+    text-align: center;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-mute);
+    padding: 0 4px;
+  }
+
   .map {
     transform-origin: 0 0;
     overflow: visible;
+    will-change: transform;
   }
 
   .hull {
