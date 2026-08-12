@@ -1,0 +1,12 @@
+---
+description: Reference codebases stay local and out of Amplify
+alwaysApply: true
+---
+
+# Reference trees
+
+These directories are **local-only** (root `.gitignore`) and must never be pushed or shipped via Amplify:
+
+`Earnings_tracker/`, `Factsheet-Automation/`, `Linker/`, `investor-portal-backend/`, `investor-portal-mobile/`, `phoenician-intelligence/`, `phoenician-intelligence-backend/`, `phoenician-intelligence-frontend/`, `phoenician-mail-sender/`, `phoenician-portfolio/`, `capiq-screen-agent/`
+
+Use them to deepen understanding; persist durable insights into `.cursor/projects/<name>/` instead of relying on chat memory.

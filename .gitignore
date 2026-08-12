@@ -9,6 +9,7 @@ phoenician-intelligence-backend/
 phoenician-intelligence-frontend/
 phoenician-mail-sender/
 phoenician-portfolio/
+capiq-screen-agent/
 
 # Dependencies
 node_modules/

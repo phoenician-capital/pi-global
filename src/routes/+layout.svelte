@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-  <title>PI Global</title>
+  <title>Phoenician Capital · Software Universe</title>
 </svelte:head>
 
 {@render children()}

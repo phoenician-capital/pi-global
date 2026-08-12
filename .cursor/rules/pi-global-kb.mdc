@@ -1,0 +1,10 @@
+---
+description: Use final .cursor KB (COMPLETENESS + tiny-logic) for Phoenician infra
+alwaysApply: true
+---
+
+# PI Global knowledge base (final)
+
+- Prefer `.cursor/` over gitignored reference trees.
+- Start: `AGENTS.md` → `systems/COMPLETENESS.md` → `systems/tiny-logic-index.md` → `projects/<name>/`.
+- Never invent edges. Never commit secrets.
