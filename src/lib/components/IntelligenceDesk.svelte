@@ -1,5 +1,6 @@
 <script>
   import DossierView from "./DossierView.svelte";
+  import DdSectionsPanel from "./DdSectionsPanel.svelte";
   import {
     dossierFor,
     intelligenceProjects,
@@ -11,16 +12,18 @@
   /**
    * @type {{
    *   selectedId: string|null,
+   *   initialTab?: 'overview'|'calls'|'prompts'|'sections'|null,
    *   onselect: (id: string) => void,
    *   onshowmap?: (id: string) => void,
    *   onatlas?: (id: string) => void,
    * }}
    */
-  let { selectedId = null, onselect, onshowmap, onatlas } = $props();
+  let { selectedId = null, initialTab = null, onselect, onshowmap, onatlas } = $props();
 
-  let deskTab = $state(/** @type {'overview'|'calls'|'prompts'} */ ("overview"));
+  let deskTab = $state(/** @type {'overview'|'calls'|'prompts'|'sections'} */ ("overview"));
   let q = $state("");
   let llmOnly = $state(false);
+  let appliedInitial = $state(/** @type {string|null} */ (null));
 
   const projects = $derived(
     intelligenceProjects().map((p) => {
@@ -55,16 +58,29 @@
   const guide = $derived(activeId ? guideFor(activeId) : null);
   const activeNode = $derived(activeId ? nodeById.get(activeId) : null);
   const intelHits = $derived(q.trim().length >= 2 ? searchIntelligence(q).slice(0, 6) : []);
+  const isDdEngine = $derived(activeId === "pi-py");
 
   const previewCalls = $derived((dossier?.calls ?? []).slice(0, 8));
   const previewModels = $derived((dossier?.prompting.models ?? []).slice(0, 6));
   const previewFrags = $derived((dossier?.prompting.fragments ?? []).slice(0, 4));
 
-  /** @param {string} id @param {'overview'|'calls'|'prompts'} [tab] */
+  /** @param {string} id @param {'overview'|'calls'|'prompts'|'sections'} [tab] */
   function pick(id, tab = "overview") {
     onselect(id);
-    deskTab = tab;
+    if (tab === "sections" && id !== "pi-py") deskTab = "overview";
+    else deskTab = tab;
   }
+
+  $effect(() => {
+    if (deskTab === "sections" && activeId !== "pi-py") deskTab = "overview";
+  });
+
+  $effect(() => {
+    if (!initialTab || initialTab === appliedInitial) return;
+    if (initialTab === "sections" && selectedId !== "pi-py") return;
+    deskTab = initialTab;
+    appliedInitial = initialTab;
+  });
 </script>
 
 {#snippet productRow(p)}
@@ -166,6 +182,11 @@
             <button type="button" class:on={deskTab === "overview"} onclick={() => (deskTab = "overview")}>
               Overview
             </button>
+            {#if isDdEngine}
+              <button type="button" class:on={deskTab === "sections"} onclick={() => (deskTab = "sections")}>
+                DD sections
+              </button>
+            {/if}
             <button type="button" class:on={deskTab === "calls"} onclick={() => (deskTab = "calls")}>
               Talks to
             </button>
@@ -185,7 +206,9 @@
       </header>
 
       <div class="main-body">
-        {#if deskTab === "overview"}
+        {#if deskTab === "sections" && isDdEngine}
+          <DdSectionsPanel />
+        {:else if deskTab === "overview"}
           <div class="overview">
             <div class="fact-strip">
               <div>
@@ -229,6 +252,20 @@
                     </button>
                   {/each}
                 </div>
+              </div>
+            {/if}
+
+            {#if isDdEngine}
+              <div class="band dd-cta">
+                <div class="band-head">
+                  <h3>DD sections · per-section calls</h3>
+                  <button type="button" class="text-cta" onclick={() => (deskTab = "sections")}>
+                    Open full section map →
+                  </button>
+                </div>
+                <p class="dd-hint">
+                  Production order §2→3→4→5→6→7→8→9→10→12→1→11 — templates, models, RAG/web/CapIQ calls for each section, plus CJA / UE-DCF / RFW / ACS / H2H / Risk.
+                </p>
               </div>
             {/if}
 
@@ -607,6 +644,20 @@
   .overview {
     display: grid;
     gap: 12px;
+  }
+
+  .dd-cta {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(47, 111, 138, 0.28);
+    background: rgba(47, 111, 138, 0.06);
+  }
+
+  .dd-hint {
+    margin: 0;
+    font-size: 0.74rem;
+    color: var(--fg-dim);
+    line-height: 1.35;
   }
 
   .fact-strip {

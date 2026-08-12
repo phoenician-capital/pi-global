@@ -19,7 +19,7 @@ You are working in **`pi-global`**: SvelteKit static site on Amplify that will *
 |---------|----------------|
 | **Live UI → `Map`** | Constellation with LOD zoom, vendor toggle, path hops, blast up/down colors. |
 | **Live UI → `Product guides`** | Guided desk: Simple → Talks to → AI. **Show on map** bridges back. |
-| **Live UI → `AI & calls`** | **Cross-project atlas:** every model role, writing-rule fragment, and call-kind taxonomy (+ per-product connection tables). |
+| **Live UI → `AI & calls`** | **Prompt & call constellation map:** products sized by connections, activity-mix rings, model orbits, provider spokes; lenses for call types / model providers; inspector for precise dossiers. |
 | **Live UI → `Walkthroughs`** | Step rail + play-through of confirmed workflows (plain-English steps). |
 | **⌘K search** | Products, journeys, business functions, schedulers, AI/calls — with starter suggestions. |
 | **Markdown source of truth** | `.cursor/systems/call-taxonomy.md` · `call-architecture.md` · `ai-prompting-map.md` · each `projects/<name>/call-architecture.md` + `ai-prompting.md` |

@@ -27,6 +27,8 @@ Audited against all **11** reference trees (incl. `capiq-screen-agent`) + pi-glo
 | Portal AI extractors (class→model) | ✅ | `ai-prompting.md` |
 | PI .NET DevOps Anthropic prompts | ✅ | `phoenician-intelligence-backend/ai-prompting.md` |
 | Cross-project AI & calls atlas (UI) | ✅ | `PromptAtlas` · primary nav **AI & calls** · `intelligence.js` |
+| DD per-section calls / prompts (UI+data) | ✅ | `ddSections.js` · Product guides → DD engine → **DD sections** |
+| Screener domain box on map | ✅ | `domains.screener` · screen + linker peer to Research / Portfolio / Investors |
 | Mobile both forks screens/services/versions | ✅ | `screens-inventory.md` |
 | Mail sender modules | ✅ | `module-map.md` |
 | Linkage / AWS / URLs / auth / CapIQ map | ✅ | `systems/*` |

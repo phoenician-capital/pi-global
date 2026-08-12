@@ -19,9 +19,11 @@ Source: `src/engines/reportGenerator.py` (+ engines under `src/engines/`).
 | 11 | Research Challenge | *(no section_N.jinja — ACS workflow)* | Needs 1–10 |
 | 12 | Red Flags | *(RFW workflow)* | No deps; runs before Conclusion in order |
 
-- `SECTIONS_ORDER` = `[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 1]` (11 ACS is separate path).
+- `reportGenerator.SECTIONS_ORDER` = `[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 1]` (11 ACS not in this helper loop).
+- **Production** `workflow.py` `sections_order` = `[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 1, 11]` (ACS last). Parallel pairs: **2∥10**, **6∥7**. §12 RFW starts as background from t≈0 and is collected before §1.
 - `TOTAL_SECTIONS` = `12`.
 - Progress file: `/app/companies/{ticker}/progress.json`.
+- **Live UI depth:** `src/lib/ecosystem/ddSections.js` + Product guides → **DD engine** → **DD sections** tab (per-section calls, templates, models, subs CJA/UE/comps, optional H2H/RA/Brain).
 
 ## `SECTION_DEPENDENCIES`
 
@@ -84,6 +86,34 @@ Langfuse span: `H2H_Competitor_Research`.
 6. Audit each risk (Opus); risk1 sync cache-warm, rest parallel ≤5  
 7. Executive summary (Sonnet) + renumber by materiality  
 8. Write `risk_audit.json`
+
+## UE-DCF steps (`unit_economics_workflow` / §8)
+
+Provider via `DCF_LLM_PROVIDER` ∈ `{openai, claude, grok, deepseek}` → `dcf_llm_registry.DCFStepRole`.
+
+| Step | Role / action | Prompt (typical) |
+|------|---------------|------------------|
+| 0 | STRUCTURED discovery | `unit_economics_discovery_prompt.jinja` |
+| 1 | EXTRACTION (filings RAG) | `rag_dcf_extraction_prompt.jinja` |
+| 1b | EXTRACTION (prior sections) | `dcf_context_extraction_prompt.jinja` |
+| 1c | CONSTRAINTS map | `constraints_guidance_prompt.jinja` |
+| 2 | CODEGEN 7-tab openpyxl | `generate_dcf_model_prompt.jinja` |
+| 2b | SANITY_REVIEW (+ optional fix) | `code_sanity_review_prompt.jinja` |
+| 3 / 3b | Review + CODE_FIX | `code_review_prompt.jinja` / `code_correction_prompt.jinja` |
+| 3c | BS_BALANCE_GATE (skippable) | `bs_balance_gate_prompt.jinja` |
+| 4 | Compile (no LLM) | — |
+| 5 | Execute → `.xlsx` | sandbox |
+| 5.6 | LibreOffice cache | `soffice` |
+| 5.8 | P/V coherence (0.3–3.0, skippable) | `pv_coherence_gate*.jinja` |
+| 6 | DOCUMENTATION | `documentation_prompt.jinja` |
+| §8 prose | WRITING / `call_claude_writing` | `dcf_executive_summary_prompt.jinja` |
+
+## CJA (§2.5) / ACS (§11) / RFW (§12) / TIW (§10)
+
+- **CJA:** steps 1–6 in `cja_steps.py` (Gemini structured + Perplexity step2 + Claude draft).
+- **ACS:** steps 2–4 in `acs_steps.py` (`step2_trigger_analysis` → contrarian → cross-exam).
+- **RFW:** Serp preflight → parallel group web → `synthesis.jinja`.
+- **TIW:** Python calcs → Perplexity sentiment → unified Claude write.
 
 ## Langfuse (`src/core/workflow.py`)
 

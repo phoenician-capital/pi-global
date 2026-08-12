@@ -216,7 +216,7 @@ export const plainGuides = {
   screen: {
     title: "Screener",
     oneLiner: "Core product — CapIQ universe triage with the PM’s living framework (Pass/Watch).",
-    doesThis: "Chat and triage while working in CapIQ; remembers principles over time. Embedded as its own workspace beside Diligence and Risks.",
+    doesThis: "Chat and triage while working in CapIQ; remembers principles over time. Own map box (peer to Research hub / Portfolio / Investors); also embeds inside the PI shell.",
     doesNot: "Not Linker (hyperlinks) and not PI’s CapIQ Excel download bots — separate CapIQ consumers.",
     whoFor: "PM / screening workflow (browser extension + embedded dashboard in PI).",
     aiStory: "Heavy AI: chat, screen triage, auditor, memory. Partner vs Screener personas.",
@@ -225,8 +225,8 @@ export const plainGuides = {
   linker: {
     title: "Linker",
     oneLiner: "Two tools: a web uploader that injects CapIQ hyperlinks into Excel, and a CLI that scores capital allocation.",
-    doesThis: "Web path patches workbooks. CLI path can ask Claude for a qualitative score.",
-    doesNot: "The website linker has no AI. Not the Screener.",
+    doesThis: "Web path patches workbooks. CLI path can ask Claude for a qualitative score. Lives in the Screener map cluster.",
+    doesNot: "The website linker has no AI. Not the Screener agent itself.",
     whoFor: "Analysts needing CapIQ-linked sheets; CLI for ranking runs.",
     aiStory: "AI only in the CLI qualitative step (Claude). The web uploader has no AI.",
     readOrder: ["Read “does not” → separate CLI vs web rows → AI tab."],

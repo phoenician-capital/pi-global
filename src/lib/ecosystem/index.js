@@ -26,6 +26,14 @@ export {
   searchIntelligence,
 } from "./intelligence.js";
 export { guideFor, plainForKind, kindPlain, plainGuides } from "./plainGuide.js";
+export {
+  ddSections,
+  ddGenOrder,
+  ddPipelinePhases,
+  ddOptionalJobs,
+  ddSectionsInGenOrder,
+  ddSectionById,
+} from "./ddSections.js";
 export { businessLayout, lodBand, majorProducts, nodeVisibleAtLod } from "./layout.js";
 export { blastLayers, animateValues } from "./motion.js";
 

@@ -125,6 +125,9 @@
         {#if dossier && onopendesk}
           <button onclick={() => onopendesk(node.id)}>Open full guide</button>
         {/if}
+        {#if node.id === "pi-py" && onopendesk}
+          <button onclick={() => onopendesk(node.id, "sections")}>DD sections (per-section calls)</button>
+        {/if}
         <button onclick={() => onblast(node.id)}>What breaks if this fails?</button>
       </section>
 

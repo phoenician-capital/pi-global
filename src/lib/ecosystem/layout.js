@@ -83,7 +83,6 @@ export const majorProductIds = [
 /** Side-project nodes — visible, but not the first story */
 export const sideProductIds = [
   "earnings",
-  "linker",
   "factsheet",
   "mail-sender",
   "portal-api",

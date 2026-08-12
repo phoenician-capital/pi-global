@@ -447,13 +447,16 @@
     }
   }
 
-  /** @param {string} id */
-  function openIntelligenceDesk(id) {
+  let deskInitialTab = $state(/** @type {'overview'|'calls'|'prompts'|'sections'|null} */ (null));
+
+  /** @param {string} id @param {'overview'|'calls'|'prompts'|'sections'} [tab] */
+  function openIntelligenceDesk(id, tab = "overview") {
     stopPlay();
     view = "intelligence";
     selectedId = id;
     selectedEdgeId = null;
-    toast = "Inside this product";
+    deskInitialTab = tab;
+    toast = tab === "sections" ? "DD sections · per-section calls" : "Inside this product";
   }
 
   /** @param {string} id */
@@ -552,6 +555,7 @@
     {#if view === "intelligence"}
       <IntelligenceDesk
         selectedId={selectedId}
+        initialTab={deskInitialTab}
         onselect={(id) => {
           selectedId = id;
         }}

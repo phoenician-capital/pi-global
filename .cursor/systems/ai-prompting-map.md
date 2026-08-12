@@ -79,4 +79,4 @@ Factsheet-Automation · phoenician-mail-sender · pi-global scaffold · PI front
 
 ## Live UI
 
-Open **`AI & calls`** in the product map for the cross-project atlas (models × jobs, writing rules, call-type legend, per-product connection tables). Per-product depth also lives under **Product guides → Talks to / AI**.
+Open **`AI & calls`** in the product map for the cross-project atlas (models × jobs, writing rules, call-type legend, per-product connection tables). Per-product depth also lives under **Product guides → Talks to / AI**. For DD engine extreme depth: **Product guides → DD engine → DD sections** (`src/lib/ecosystem/ddSections.js`).
