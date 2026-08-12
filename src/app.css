@@ -1,24 +1,31 @@
 :root {
-  color-scheme: dark;
-  --ink: #0c1014;
-  --ink-2: #121820;
-  --ink-3: #1a222c;
-  --panel: rgba(18, 24, 32, 0.92);
-  --panel-border: rgba(212, 184, 126, 0.18);
-  --fg: #efece4;
-  --fg-dim: #a39e93;
-  --fg-mute: #6e6a62;
-  --gold: #c4a35a;
-  --gold-soft: #d4b87e;
-  --cyan: #7eb8d4;
-  --mint: #8fc496;
-  --rose: #d48fa3;
-  --line: rgba(239, 236, 228, 0.08);
-  --danger: #e07a6a;
+  color-scheme: light;
+  /* Page atmosphere — light paper, not flat white */
+  --ink: #f4f1ea;
+  --ink-2: #ebe6dc;
+  --ink-3: #e0d9cc;
+  --panel: rgba(255, 252, 247, 0.94);
+  --panel-border: rgba(60, 52, 40, 0.14);
+  /* Darker content on light ground */
+  --fg: #1c1914;
+  --fg-dim: #4a453c;
+  --fg-mute: #6f685c;
+  --gold: #8a6a2f;
+  --gold-soft: #a07d3a;
+  --cyan: #2f6f8a;
+  --mint: #3d6b48;
+  --rose: #9a4d63;
+  --line: rgba(28, 25, 20, 0.1);
+  --danger: #b54a3c;
+  --node-fill: #ffffff;
+  --node-fill-data: #f0f4f7;
+  --node-fill-vendor: #faf6ef;
+  --node-stroke: #2a241c;
+  --map-edge: rgba(42, 36, 28, 0.45);
   --radius: 14px;
   --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
   --font-ui: "Sora", ui-sans-serif, system-ui, sans-serif;
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --shadow: 0 18px 48px rgba(40, 32, 20, 0.12);
   font-family: var(--font-ui);
   font-weight: 400;
   line-height: 1.45;
@@ -66,7 +73,7 @@ button {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(196, 163, 90, 0.28);
+  background: rgba(138, 106, 47, 0.28);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-track {
@@ -95,5 +102,21 @@ button {
   }
   100% {
     opacity: 0;
+  }
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

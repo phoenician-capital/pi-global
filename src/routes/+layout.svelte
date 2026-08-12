@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-  <title>Phoenician Capital · Software Universe</title>
+  <title>Phoenician Intelligence · Product map</title>
 </svelte:head>
 
 {@render children()}

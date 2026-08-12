@@ -1,5 +1,5 @@
 <script>
-  import { searchAll } from "$lib/ecosystem/index.js";
+  import { searchAll, searchSuggestions } from "$lib/ecosystem/index.js";
 
   /**
    * @type {{
@@ -22,22 +22,41 @@
     }
   });
 
+  $effect(() => {
+    q;
+    active = 0;
+  });
+
   /** @param {KeyboardEvent} ev */
   function onKey(ev) {
+    const listLen = q.trim() ? hits.length : searchSuggestions.length;
     if (ev.key === "Escape") {
       ev.preventDefault();
       onclose();
     } else if (ev.key === "ArrowDown") {
       ev.preventDefault();
-      active = Math.min(hits.length - 1, active + 1);
+      active = Math.min(listLen - 1, active + 1);
     } else if (ev.key === "ArrowUp") {
       ev.preventDefault();
       active = Math.max(0, active - 1);
-    } else if (ev.key === "Enter" && hits[active]) {
+    } else if (ev.key === "Enter") {
       ev.preventDefault();
-      onpick(hits[active]);
+      if (q.trim() && hits[active]) onpick(hits[active]);
+      else if (!q.trim() && searchSuggestions[active]) {
+        const s = searchSuggestions[active];
+        onpick({ kind: s.kind, id: s.id });
+      }
     }
   }
+
+  const kindLabel = {
+    node: "Product",
+    edge: "Link",
+    journey: "Journey",
+    business: "Business",
+    scheduler: "Schedule",
+    intelligence: "AI / calls",
+  };
 </script>
 
 {#if open}
@@ -58,27 +77,44 @@
         <input
           id="cmd-input"
           bind:value={q}
-          placeholder="Search projects, APIs, databases, journeys, vendors…"
+          placeholder="Search products, journeys, AI models, schedules, APIs…"
           autocomplete="off"
           spellcheck="false"
         />
       </div>
       <ul>
-        {#each hits as hit, i}
-          <li>
-            <button
-              class:active={i === active}
-              onclick={() => onpick(hit)}
-              onmouseenter={() => (active = i)}
-            >
-              <span class="kind">{hit.kind}</span>
-              <span class="title">{hit.title}</span>
-              <span class="sub">{hit.subtitle}</span>
-            </button>
-          </li>
+        {#if q.trim()}
+          {#each hits as hit, i}
+            <li>
+              <button
+                class:active={i === active}
+                onclick={() => onpick(hit)}
+                onmouseenter={() => (active = i)}
+              >
+                <span class="kind">{kindLabel[hit.kind] ?? hit.kind}</span>
+                <span class="title">{hit.title}</span>
+                <span class="sub">{hit.subtitle}</span>
+              </button>
+            </li>
+          {:else}
+            <li class="empty">No matches — try “DD report”, “CapIQ”, or “Resend”</li>
+          {/each}
         {:else}
-          <li class="empty">{q ? "No matches" : "Type to search the universe"}</li>
-        {/each}
+          <li class="hint">Suggested starting points</li>
+          {#each searchSuggestions as s, i}
+            <li>
+              <button
+                class:active={i === active}
+                onclick={() => onpick({ kind: s.kind, id: s.id })}
+                onmouseenter={() => (active = i)}
+              >
+                <span class="kind">{kindLabel[s.kind] ?? s.kind}</span>
+                <span class="title">{s.label}</span>
+                <span class="sub">Jump into the universe</span>
+              </button>
+            </li>
+          {/each}
+        {/if}
       </ul>
     </div>
   </div>
@@ -88,7 +124,7 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(8, 10, 14, 0.72);
+    background: rgba(40, 32, 20, 0.28);
     backdrop-filter: blur(8px);
     z-index: 40;
     display: grid;
@@ -99,7 +135,7 @@
 
   .palette {
     width: min(640px, 100%);
-    background: var(--ink-2);
+    background: var(--panel);
     border: 1px solid var(--panel-border);
     border-radius: 16px;
     box-shadow: var(--shadow);
@@ -116,64 +152,74 @@
   }
 
   .kbd-hint {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--gold);
     border: 1px solid rgba(196, 163, 90, 0.35);
-    border-radius: 6px;
+    border-radius: 4px;
     padding: 2px 6px;
   }
 
   input {
     flex: 1;
-    background: transparent;
     border: none;
-    outline: none;
-    font-size: 1rem;
+    background: transparent;
     color: var(--fg);
+    font-size: 1rem;
+    outline: none;
   }
 
   ul {
+    list-style: none;
     margin: 0;
     padding: 8px;
-    list-style: none;
-    max-height: 420px;
+    max-height: 360px;
     overflow: auto;
+  }
+
+  .hint,
+  .empty {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    color: var(--fg-mute);
   }
 
   button {
     width: 100%;
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    grid-template-rows: auto auto;
+    gap: 2px 10px;
     text-align: left;
     padding: 10px 12px;
     border-radius: 10px;
-    display: grid;
-    gap: 2px;
   }
 
-  button.active,
-  button:hover {
-    background: rgba(196, 163, 90, 0.12);
+  button:hover,
+  button.active {
+    background: rgba(196, 163, 90, 0.1);
   }
 
   .kind {
+    grid-row: 1 / span 2;
+    align-self: center;
     font-size: 10px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--gold);
   }
 
   .title {
+    font-size: 0.9rem;
+    color: var(--fg);
     font-weight: 500;
   }
 
   .sub {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--fg-mute);
-  }
-
-  .empty {
-    padding: 24px;
-    text-align: center;
-    color: var(--fg-mute);
-    font-size: 0.9rem;
+    grid-column: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

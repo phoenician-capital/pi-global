@@ -20,6 +20,8 @@ Distilled from **source-level** reads of every reference tree. Env **names only*
 | **Deep inventories** | [`systems/deep-inventory.md`](./systems/deep-inventory.md) |
 | **Call taxonomy** | [`systems/call-taxonomy.md`](./systems/call-taxonomy.md) |
 | **Call architecture** | [`systems/call-architecture.md`](./systems/call-architecture.md) |
+| **Per-project calls + prompts** | `projects/<name>/call-architecture.md` + `ai-prompting.md` |
+| **Live UI (Calls & Prompts desk)** | App view **Calls & Prompts** · data in `src/lib/ecosystem/intelligence.js` |
 | **Completeness checklist** | [`systems/COMPLETENESS.md`](./systems/COMPLETENESS.md) |
 | Compose / CLIs | [`systems/compose-and-scripts.md`](./systems/compose-and-scripts.md) |
 

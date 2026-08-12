@@ -62,6 +62,21 @@ Full: [`projects/capiq-screen-agent/ai-prompting.md`](../projects/capiq-screen-a
 
 OpenAI `gpt-4o-mini` (+ `gpt-4o` vision for some extract/amount paths) on admin document AI rename/verify endpoints.
 
-## No AI
+## PI control (.NET)
 
-Factsheet-Automation · phoenician-mail-sender · pi-global scaffold · PI frontend (proxies only) · Linker web.
+| Role | Model |
+|------|-------|
+| Error / log triage | `claude-haiku-4-5-20251001` (`DeveloperController`) |
+| Run analysis + log chat | `claude-sonnet-4-6` |
+| TTS (not report writing) | OpenAI `/v1/audio/speech` |
+
+Full: [`projects/phoenician-intelligence-backend/ai-prompting.md`](../projects/phoenician-intelligence-backend/ai-prompting.md).  
+Does **not** write DD sections — that is PI Python.
+
+## No AI (generation)
+
+Factsheet-Automation · phoenician-mail-sender · pi-global scaffold · PI frontend (proxies only) · Linker **web** (CLI qualitative Claude is separate).
+
+## Live UI
+
+Open **`AI & calls`** in the product map for the cross-project atlas (models × jobs, writing rules, call-type legend, per-product connection tables). Per-product depth also lives under **Product guides → Talks to / AI**.

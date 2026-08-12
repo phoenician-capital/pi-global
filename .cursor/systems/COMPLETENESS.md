@@ -25,6 +25,8 @@ Audited against all **11** reference trees (incl. `capiq-screen-agent`) + pi-glo
 | Portal enums / features / Hangfire / services | ✅ | `domain-enums.md`, `features-inventory.md` |
 | Portal admin + investor routes | ✅ | `admin-routes.md` |
 | Portal AI extractors (class→model) | ✅ | `ai-prompting.md` |
+| PI .NET DevOps Anthropic prompts | ✅ | `phoenician-intelligence-backend/ai-prompting.md` |
+| Cross-project AI & calls atlas (UI) | ✅ | `PromptAtlas` · primary nav **AI & calls** · `intelligence.js` |
 | Mobile both forks screens/services/versions | ✅ | `screens-inventory.md` |
 | Mail sender modules | ✅ | `module-map.md` |
 | Linkage / AWS / URLs / auth / CapIQ map | ✅ | `systems/*` |

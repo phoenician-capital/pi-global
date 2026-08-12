@@ -1,62 +1,128 @@
-/** @type {Record<string, { id: string, name: string, blurb: string, color: string, accent: string }>} */
+/**
+ * @type {Record<string, { id: string, name: string, shortLabel: string, blurb: string, color: string, accent: string }>}
+ */
 export const domains = {
   intelligence: {
     id: "intelligence",
     name: "Phoenician Intelligence",
-    blurb: "Diligence shell → .NET BFF → Python DD factory. Hub of research UX.",
-    color: "#3d6b8a",
-    accent: "#7eb8d4",
+    shortLabel: "Research hub",
+    blurb: "IT branch of Phoenician Capital — Diligence, Risks, Screener, and the research shell.",
+    color: "#2a5570",
+    accent: "#3d7a9a",
   },
   portfolio: {
     id: "portfolio",
     name: "Portfolio Manager",
-    blurb: "Two books (Phoenician vs AI universe). Amplify SPA ↔ pm-serve ECS.",
-    color: "#6b5a3d",
-    accent: "#d4b87e",
+    shortLabel: "Portfolio",
+    blurb: "Core product — two investment books, research stages, live tips.",
+    color: "#6a5430",
+    accent: "#8a6a2f",
   },
   portal: {
     id: "portal",
     name: "Investor Portal",
-    blurb: "Investor + admin docs, KYC, IrMail, strategy factsheet. Separate auth island.",
-    color: "#4a6b4d",
-    accent: "#8fc496",
+    shortLabel: "Investors",
+    blurb: "Investor & admin docs, KYC, e-sign, IR mail — separate login island.",
+    color: "#356040",
+    accent: "#4a7a55",
   },
   ops: {
     id: "ops",
-    name: "Ops satellites",
-    blurb: "Earnings calendar, CapIQ Screen, Linker, Factsheet, mail-sender.",
+    name: "Side projects",
+    shortLabel: "Side tools",
+    blurb: "Supporting tools — Earnings calendar, Linker, factsheet, mail helper, Cost.",
     color: "#6b3d4a",
-    accent: "#d48fa3",
+    accent: "#8a5262",
   },
   platform: {
     id: "platform",
-    name: "Platform",
-    blurb: "This map (pi-global) and shared AWS account context.",
-    color: "#4a4a6b",
-    accent: "#a8a8d4",
+    name: "Platform map",
+    shortLabel: "This map",
+    blurb: "This living map of Phoenician Intelligence over the shared AWS account.",
+    color: "#454560",
+    accent: "#5a5a78",
   },
   vendor: {
     id: "vendor",
     name: "External vendors",
-    blurb: "CapIQ, LLMs, market data, Graph, DocuSeal — shared across products.",
+    shortLabel: "Outside tools",
+    blurb: "CapIQ, AI providers, market data, Graph, DocuSeal, email…",
     color: "#5a4a3a",
-    accent: "#c4a882",
+    accent: "#7a6548",
   },
   infra: {
     id: "infra",
     name: "Infrastructure",
-    blurb: "RDS, EFS, S3, Redis, Dynamo, Amplify, EB, ECS, EC2, Lightsail.",
+    shortLabel: "Storage",
+    blurb: "Databases, files, caches, and cloud hosts that store the work.",
     color: "#3a4a5a",
-    accent: "#8aabb8",
+    accent: "#4f6575",
   },
 };
 
+/**
+ * Core nodes per business function (no one-hop flood).
+ * `tier: "primary"` = big product; `tier: "side"` = supporting.
+ * @type {{ id: string, name: string, blurb: string, tier: "primary"|"side", nodeIds: string[] }[]}
+ */
 export const businessFunctions = [
-  { id: "diligence", name: "Equity diligence / DD", nodeIds: ["pi-fe", "pi-net", "pi-py", "efs-pi", "rds-pi"] },
-  { id: "screening", name: "Universe screening", nodeIds: ["screen", "pi-fe", "pi-net", "linker", "capiq"] },
-  { id: "portfolio", name: "Portfolio construction", nodeIds: ["pm-fe", "pm-serve", "s3-strategy", "redis-pm", "pi-net"] },
-  { id: "investor", name: "Investor servicing", nodeIds: ["portal-web", "portal-api", "portal-mobile", "s3-docs", "rds-portal"] },
-  { id: "earnings", name: "Earnings calendar", nodeIds: ["earnings", "pi-fe"] },
-  { id: "ir_comms", name: "IR communications", nodeIds: ["portal-api", "mail-sender", "graph"] },
-  { id: "marketing", name: "Fund marketing collateral", nodeIds: ["factsheet", "portal-api"] },
+  {
+    id: "diligence",
+    name: "Diligence (DD)",
+    blurb: "Deep company research reports — a core Phoenician Intelligence product.",
+    tier: "primary",
+    nodeIds: ["pi-fe", "pi-net", "pi-py", "efs-pi", "rds-pi", "capiq", "anthropic", "gemini", "deepseek"],
+  },
+  {
+    id: "risks",
+    name: "Risk report",
+    blurb: "Risk audits across the diligence universe — core PI product (same shell as DD).",
+    tier: "primary",
+    nodeIds: ["pi-fe", "pi-net", "pi-py", "efs-pi", "rds-pi", "anthropic"],
+  },
+  {
+    id: "screening",
+    name: "Screener",
+    blurb: "CapIQ universe triage (Pass/Watch) — core Phoenician Intelligence product.",
+    tier: "primary",
+    nodeIds: ["screen", "pi-fe", "pi-net", "linker", "capiq", "sqlite-screen", "anthropic", "deepseek"],
+  },
+  {
+    id: "portfolio",
+    name: "Portfolio",
+    blurb: "Build and review the two strategy books. DD arrives from PI over HTTP.",
+    tier: "primary",
+    nodeIds: ["pm-fe", "pm-serve", "ep", "s3-strategy", "redis-pm", "anthropic", "deepseek", "pi-net"],
+  },
+  {
+    id: "earnings",
+    name: "Earnings calendar",
+    blurb: "Side project — find and summarize earnings events (not the portfolio predictor).",
+    tier: "side",
+    nodeIds: ["earnings", "deepseek", "serpapi", "pi-fe"],
+  },
+  {
+    id: "investor",
+    name: "Investor servicing",
+    blurb: "Side / sibling island — documents, KYC, mobile, e-sign.",
+    tier: "side",
+    nodeIds: ["portal-web", "portal-api", "portal-mobile", "s3-docs", "rds-portal", "docuseal", "resend"],
+  },
+  {
+    id: "ir_comms",
+    name: "IR communications",
+    blurb: "Side project — IR email campaigns via Microsoft Graph.",
+    tier: "side",
+    nodeIds: ["portal-web", "portal-api", "mail-sender", "graph"],
+  },
+  {
+    id: "marketing",
+    name: "Fund marketing collateral",
+    blurb: "Side project — factsheets and strategy top-5.",
+    tier: "side",
+    nodeIds: ["factsheet", "portal-web", "portal-api", "dynamo-book", "fmp", "s3-strategy"],
+  },
 ];
+
+/** The four core products newcomers should learn first. */
+export const primaryBusinessIds = ["diligence", "risks", "screening", "portfolio"];
