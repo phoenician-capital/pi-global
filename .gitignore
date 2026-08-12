@@ -13,9 +13,11 @@ phoenician-portfolio/
 # Dependencies
 node_modules/
 
-# Build
+# Build / SvelteKit
+build/
 dist/
 dist-ssr/
+.svelte-kit/
 *.local
 
 # Env / secrets

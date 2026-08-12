@@ -1,5 +1,5 @@
-# Build the Vite frontend and deploy to Amplify Hosting via the manual
-# deployment API (same pattern as phoenician-portfolio / frontend-kit —
+# Build the SvelteKit static frontend and deploy to Amplify Hosting via the
+# manual deployment API (same pattern as phoenician-portfolio / frontend-kit —
 # org deploy keys are disabled, so Amplify is not git-connected).
 #
 # GitHub repo variables: AWS_REGION, AMPLIFY_APP_ID, AMPLIFY_BRANCH
@@ -75,7 +75,7 @@ jobs:
           echo "Waiting for any in-flight Amplify job on ${BRANCH}..."
           wait_amplify_idle
 
-          (cd dist && zip -qr ../artifacts.zip .)
+          (cd build && zip -qr ../artifacts.zip .)
 
           DEPLOY=""
           for attempt in $(seq 1 24); do
