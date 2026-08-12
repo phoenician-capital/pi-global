@@ -1,10 +1,9 @@
 # Build the Vite frontend and deploy to Amplify Hosting via the manual
-# deployment API (same pattern as phoenician-portfolio — no Amplify↔GitHub
-# deploy-key connection required).
+# deployment API (same pattern as phoenician-portfolio / frontend-kit —
+# org deploy keys are disabled, so Amplify is not git-connected).
 #
-# GitHub repo variables (Settings → Secrets and variables → Actions):
-#   AWS_REGION, AMPLIFY_APP_ID, AMPLIFY_BRANCH
-# Auth: OIDC → IAM role github-actions-deploy (trusted for phoenician-capital/*)
+# GitHub repo variables: AWS_REGION, AMPLIFY_APP_ID, AMPLIFY_BRANCH
+# Secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (user github-actions-pi-global)
 
 name: Deploy frontend
 
@@ -18,7 +17,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -40,7 +38,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::578736536410:role/github-actions-deploy
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Upload build to Amplify Hosting
