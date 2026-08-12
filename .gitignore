@@ -1,15 +1,16 @@
-# Reference codebases — local only, never commit / never deploy via Amplify
-Earnings_tracker/
-Factsheet-Automation/
-Linker/
-investor-portal-backend/
-investor-portal-mobile/
-phoenician-intelligence/
-phoenician-intelligence-backend/
-phoenician-intelligence-frontend/
-phoenician-mail-sender/
-phoenician-portfolio/
-capiq-screen-agent/
+# Reference codebases — local only (repo root), never commit / never deploy via Amplify
+# Leading slash = root only, so `.cursor/projects/<same-name>/` stays trackable.
+/Earnings_tracker/
+/Factsheet-Automation/
+/Linker/
+/investor-portal-backend/
+/investor-portal-mobile/
+/phoenician-intelligence/
+/phoenician-intelligence-backend/
+/phoenician-intelligence-frontend/
+/phoenician-mail-sender/
+/phoenician-portfolio/
+/capiq-screen-agent/
 
 # Dependencies
 node_modules/
