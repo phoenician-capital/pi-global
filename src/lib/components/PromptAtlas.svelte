@@ -34,16 +34,18 @@
   let hoverProv = $state(null);
 
   let wrapEl = $state(/** @type {HTMLDivElement|null} */ (null));
-  let scale = $state(0.85);
+  let svgEl = $state(/** @type {SVGSVGElement|null} */ (null));
+  /** Camera on top of viewBox meet — 1 = whole world fitted in the stage. */
+  let scale = $state(1);
   let tx = $state(0);
   let ty = $state(0);
   let panning = $state(false);
   let panStart = $state({ x: 0, y: 0, tx: 0, ty: 0 });
-  /** Once the user zooms/pans, auto-fit on resize must not fight them (plain flag — not reactive). */
-  let userCamera = false;
+  /** @type {{ id: string, x: number, y: number }|null} */
+  let nodePress = null;
 
-  const MIN_SCALE = 0.3;
-  const MAX_SCALE = 3.6;
+  const MIN_SCALE = 0.45;
+  const MAX_SCALE = 6;
   const W = promptMapWorld.w;
   const H = promptMapWorld.h;
   const zoomPct = $derived(Math.round(scale * 100));
@@ -173,37 +175,101 @@
     };
   });
 
+  /** Reset camera — viewBox `meet` already fits the world; camera scale 1 = that fit. */
   function fit() {
-    const el = wrapEl;
-    if (!el) return;
-    const { width, height } = el.getBoundingClientRect();
-    if (width < 40 || height < 40) return;
-    const pad = 48;
-    const s = clampScale(Math.min((width - pad) / W, (height - pad) / H, 1.05));
-    scale = s;
-    tx = (width - W * scale) / 2;
-    ty = (height - H * scale) / 2;
-    userCamera = false;
+    scale = 1;
+    tx = 0;
+    ty = 0;
   }
 
-  $effect(() => {
-    if (!wrapEl) return;
-    fit();
-    const el = wrapEl;
-    let lastW = 0;
-    let lastH = 0;
-    const ro = new ResizeObserver(() => {
-      const { width, height } = el.getBoundingClientRect();
-      if (Math.abs(width - lastW) < 4 && Math.abs(height - lastH) < 4) return;
-      lastW = width;
-      lastH = height;
-      // Don't yank the camera after the user has zoomed/panned.
-      if (userCamera) return;
-      fit();
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  });
+  /**
+   * Client (screen) → SVG root user units (viewBox space, before camera).
+   * @param {number} clientX
+   * @param {number} clientY
+   */
+  function clientToRoot(clientX, clientY) {
+    const svg = svgEl;
+    if (!svg) return { x: W / 2, y: H / 2 };
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: W / 2, y: H / 2 };
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const root = pt.matrixTransform(ctm.inverse());
+    return { x: root.x, y: root.y };
+  }
+
+  /** Center of the visible SVG in root (viewBox) space. */
+  function viewportRootCenter() {
+    const svg = svgEl;
+    if (!svg) return { x: W / 2, y: H / 2 };
+    const rect = svg.getBoundingClientRect();
+    return clientToRoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  /**
+   * Zoom toward a screen point (or stage center). Uses getScreenCTM — same idea as estate Map.
+   * @param {number} factor
+   * @param {number} [clientX]
+   * @param {number} [clientY]
+   */
+  function zoomAt(factor, clientX, clientY) {
+    const before = scale;
+    const next = clampScale(before * factor);
+    if (Math.abs(next - before) < 1e-6) return;
+
+    const svg = svgEl;
+    let rootX;
+    let rootY;
+    if (svg && clientX != null && clientY != null) {
+      const root = clientToRoot(clientX, clientY);
+      rootX = root.x;
+      rootY = root.y;
+    } else {
+      const c = viewportRootCenter();
+      rootX = c.x;
+      rootY = c.y;
+    }
+
+    // World point currently under the cursor
+    const wx = (rootX - tx) / before;
+    const wy = (rootY - ty) / before;
+    scale = next;
+    tx = rootX - wx * next;
+    ty = rootY - wy * next;
+  }
+
+  function zoomIn() {
+    zoomAt(1.35);
+  }
+
+  function zoomOut() {
+    zoomAt(1 / 1.35);
+  }
+
+  /**
+   * Non-passive wheel so preventDefault works (trackpad + mouse).
+   * @param {HTMLElement} node
+   */
+  function wheelZoom(node) {
+    /** @param {WheelEvent} ev */
+    const handler = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      let dy = ev.deltaY;
+      if (ev.deltaMode === 1) dy *= 16;
+      if (ev.deltaMode === 2) dy *= 120;
+      const intensity = Math.min(0.35, Math.abs(dy) / 360);
+      const factor = dy > 0 ? 1 - intensity * 0.65 : 1 + intensity * 0.75;
+      zoomAt(factor, ev.clientX, ev.clientY);
+    };
+    node.addEventListener("wheel", handler, { passive: false });
+    return {
+      destroy() {
+        node.removeEventListener("wheel", handler);
+      },
+    };
+  }
 
   /** @param {string} id */
   function pick(id) {
@@ -211,81 +277,60 @@
     layer = "constellation";
   }
 
-  /**
-   * Zoom toward a point in the stage (client coords relative to wrap), or center.
-   * @param {number} factor
-   * @param {number} [mx]
-   * @param {number} [my]
-   */
-  function zoomAt(factor, mx, my) {
-    const el = wrapEl;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const cx = mx ?? rect.width / 2;
-    const cy = my ?? rect.height / 2;
-    const before = scale;
-    const next = clampScale(scale * factor);
-    if (next === before) return;
-    const wx = (cx - tx) / before;
-    const wy = (cy - ty) / before;
-    scale = next;
-    tx = cx - wx * next;
-    ty = cy - wy * next;
-    userCamera = true;
-  }
-
-  function zoomIn() {
-    zoomAt(1.22);
-  }
-
-  function zoomOut() {
-    zoomAt(1 / 1.22);
-  }
-
-  /** @param {WheelEvent} ev */
-  function onWheel(ev) {
-    ev.preventDefault();
-    const el = wrapEl;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const mx = ev.clientX - rect.left;
-    const my = ev.clientY - rect.top;
-    // Normalize mouse wheel vs trackpad pinches
-    let dy = ev.deltaY;
-    if (ev.deltaMode === 1) dy *= 16;
-    if (ev.deltaMode === 2) dy *= rect.height;
-    const intensity = Math.min(0.28, Math.abs(dy) / 420);
-    const factor = dy > 0 ? 1 - intensity * 0.55 : 1 + intensity * 0.65;
-    zoomAt(factor, mx, my);
-  }
-
   /** @param {PointerEvent} ev */
   function onPointerDown(ev) {
-    if (/** @type {Element} */ (ev.target).closest?.("[data-node], .zoom-pad")) return;
+    if (ev.button != null && ev.button !== 0) return;
+    const t = /** @type {Element} */ (ev.target);
+    if (t.closest?.(".zoom-pad, button, a, input")) return;
+    if (t.closest?.("[data-node]")) return;
     panning = true;
     panStart = { x: ev.clientX, y: ev.clientY, tx, ty };
-    wrapEl?.setPointerCapture(ev.pointerId);
+    svgEl?.setPointerCapture?.(ev.pointerId);
   }
 
   /** @param {PointerEvent} ev */
   function onPointerMove(ev) {
-    if (!panning) return;
-    tx = panStart.tx + (ev.clientX - panStart.x);
-    ty = panStart.ty + (ev.clientY - panStart.y);
-    userCamera = true;
+    if (!panning || !svgEl) return;
+    // Pan in root/viewBox units (not CSS px) so drag matches the camera.
+    const a = clientToRoot(panStart.x, panStart.y);
+    const b = clientToRoot(ev.clientX, ev.clientY);
+    tx = panStart.tx + (b.x - a.x);
+    ty = panStart.ty + (b.y - a.y);
   }
 
-  function onPointerUp() {
+  /** @param {PointerEvent} ev */
+  function onPointerUp(ev) {
+    if (!panning) return;
     panning = false;
+    try {
+      svgEl?.releasePointerCapture?.(ev.pointerId);
+    } catch {
+      /* already released */
+    }
   }
 
   /** @param {MouseEvent} ev */
   function onDblClick(ev) {
-    if (/** @type {Element} */ (ev.target).closest?.("[data-node], .zoom-pad, button")) return;
-    const el = wrapEl;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    zoomAt(ev.shiftKey ? 1 / 1.45 : 1.45, ev.clientX - rect.left, ev.clientY - rect.top);
+    const t = /** @type {Element} */ (ev.target);
+    if (t.closest?.("[data-node], .zoom-pad, button")) return;
+    zoomAt(ev.shiftKey ? 1 / 1.5 : 1.5, ev.clientX, ev.clientY);
+  }
+
+  /** @param {PointerEvent} ev @param {string} id */
+  function onNodePointerDown(ev, id) {
+    ev.stopPropagation();
+    nodePress = { id, x: ev.clientX, y: ev.clientY };
+  }
+
+  /** @param {PointerEvent} ev @param {string} id */
+  function onNodePointerUp(ev, id) {
+    ev.stopPropagation();
+    const press = nodePress;
+    nodePress = null;
+    if (!press || press.id !== id) return;
+    const dx = ev.clientX - press.x;
+    const dy = ev.clientY - press.y;
+    if (dx * dx + dy * dy < 144) pick(id);
   }
 
   /**
@@ -406,30 +451,59 @@
   {/if}
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="stage"
-    class:grabbing={panning}
-    bind:this={wrapEl}
-    onwheel={onWheel}
-    onpointerdown={onPointerDown}
-    onpointermove={onPointerMove}
-    onpointerup={onPointerUp}
-    onpointercancel={onPointerUp}
-    ondblclick={onDblClick}
-  >
-    <div class="zoom-pad" role="toolbar" aria-label="Zoom">
-      <button type="button" title="Zoom in (+)" aria-label="Zoom in" onclick={zoomIn}>+</button>
-      <button type="button" title="Zoom out (−)" aria-label="Zoom out" onclick={zoomOut}>−</button>
-      <button type="button" class="wide" title="Fit all" onclick={fit}>Fit</button>
+  <div class="stage" class:grabbing={panning} bind:this={wrapEl} use:wheelZoom>
+    <div
+      class="zoom-pad"
+      role="toolbar"
+      aria-label="Zoom"
+      onpointerdown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        title="Zoom in (+)"
+        aria-label="Zoom in"
+        onpointerdown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          zoomIn();
+        }}
+      >+</button>
+      <button
+        type="button"
+        title="Zoom out (−)"
+        aria-label="Zoom out"
+        onpointerdown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          zoomOut();
+        }}
+      >−</button>
+      <button
+        type="button"
+        class="wide"
+        title="Fit all"
+        onpointerdown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          fit();
+        }}
+      >Fit</button>
       <span class="pct" title="Current zoom">{zoomPct}%</span>
     </div>
 
     <svg
+      bind:this={svgEl}
       class="map"
-      width={W}
-      height={H}
+      class:grabbing={panning}
       viewBox={`0 0 ${W} ${H}`}
-      style:transform={`translate(${tx}px, ${ty}px) scale(${scale})`}
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      aria-label="Prompt and call constellation"
+      onpointerdown={onPointerDown}
+      onpointermove={onPointerMove}
+      onpointerup={onPointerUp}
+      onpointercancel={onPointerUp}
+      ondblclick={onDblClick}
     >
       <defs>
         <radialGradient id="atlas-glow" cx="50%" cy="45%" r="55%">
@@ -443,16 +517,20 @@
         </filter>
       </defs>
 
-      <rect width={W} height={H} fill="url(#atlas-glow)" />
+      <!-- viewBox fits the world; this group is the zoom/pan camera (estate-Map model). -->
+      <g class="camera" transform={`translate(${tx} ${ty}) scale(${scale})`}>
+      <rect width={W} height={H} fill="url(#atlas-glow)" pointer-events="none" />
 
       <!-- Domain hulls -->
-      <g class="hulls" opacity="0.55">
-        <ellipse cx="430" cy="350" rx="200" ry="160" class="hull research" />
-        <text x="280" y="220" class="hull-label">Research hub</text>
+      <g class="hulls" opacity="0.55" pointer-events="none">
+        <ellipse cx="200" cy="460" rx="160" ry="280" class="hull ops" />
+        <text x="100" y="200" class="hull-label">Side tools</text>
+        <ellipse cx="600" cy="340" rx="200" ry="160" class="hull research" />
+        <text x="460" y="200" class="hull-label">Research hub</text>
         <ellipse cx="1040" cy="360" rx="180" ry="150" class="hull portfolio" />
         <text x="960" y="230" class="hull-label">Portfolio</text>
-        <ellipse cx="700" cy="720" rx="220" ry="100" class="hull portal" />
-        <text x="620" y="640" class="hull-label">Investors</text>
+        <ellipse cx="700" cy="740" rx="220" ry="100" class="hull portal" />
+        <text x="620" y="660" class="hull-label">Investors</text>
       </g>
 
       <!-- Kinship ribbons (shared call kinds) -->
@@ -561,11 +639,13 @@
             transform={`translate(${p.x}, ${p.y})`}
             onpointerenter={() => (hoverId = p.nodeId)}
             onpointerleave={() => (hoverId = null)}
-            onclick={() => pick(p.nodeId)}
+            onpointerdown={(e) => onNodePointerDown(e, p.nodeId)}
+            onpointerup={(e) => onNodePointerUp(e, p.nodeId)}
             role="button"
             tabindex="0"
             onkeydown={(e) => e.key === "Enter" && pick(p.nodeId)}
           >
+            <circle class="hit" r={p.r + 16} />
             {#if on}
               <circle r={p.r + 10} class="pulse" />
             {/if}
@@ -580,6 +660,7 @@
           </g>
         {/each}
       </g>
+      </g>
     </svg>
 
     {#if tip}
@@ -590,7 +671,7 @@
     {/if}
 
     <p class="hint-bar">
-      Scroll / pinch to zoom · drag to pan · double-click zoom in (Shift = out) · +/− pad
+      + / − / scroll to zoom · drag to pan · double-click zoom in · Fit resets
     </p>
   </div>
 
@@ -835,7 +916,8 @@
 
   .stage {
     position: relative;
-    min-height: 0;
+    min-height: 280px;
+    height: 100%;
     cursor: grab;
     overflow: hidden;
     touch-action: none;
@@ -848,18 +930,19 @@
 
   .zoom-pad {
     position: absolute;
-    z-index: 4;
+    z-index: 20;
     left: 12px;
-    bottom: 36px;
+    top: 12px;
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 5px;
     border-radius: 12px;
-    background: rgba(255, 253, 248, 0.92);
+    background: rgba(255, 253, 248, 0.96);
     border: 1px solid var(--panel-border);
-    box-shadow: 0 8px 22px rgba(28, 25, 20, 0.08);
+    box-shadow: 0 8px 22px rgba(28, 25, 20, 0.1);
     backdrop-filter: blur(8px);
+    pointer-events: auto;
   }
 
   .zoom-pad button {
@@ -897,9 +980,18 @@
   }
 
   .map {
-    transform-origin: 0 0;
-    overflow: visible;
-    will-change: transform;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 280px;
+    touch-action: none;
+    cursor: grab;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  .map.grabbing {
+    cursor: grabbing;
   }
 
   .hull {
@@ -910,6 +1002,10 @@
 
   .hull.research {
     fill: rgba(42, 85, 112, 0.05);
+  }
+
+  .hull.ops {
+    fill: rgba(30, 90, 92, 0.07);
   }
 
   .hull.portfolio {
@@ -932,6 +1028,7 @@
     fill: none;
     stroke: rgba(138, 106, 47, 0.18);
     stroke-linecap: round;
+    pointer-events: none;
   }
 
   .kin-path.dim {
@@ -941,6 +1038,7 @@
   .spoke {
     stroke: rgba(47, 111, 138, 0.28);
     stroke-dasharray: 3 5;
+    pointer-events: none;
   }
 
   .spoke.dim {
@@ -1017,6 +1115,12 @@
     cursor: pointer;
   }
 
+  .product .hit {
+    fill: transparent;
+    stroke: none;
+    pointer-events: all;
+  }
+
   .product .body {
     fill: #fff;
     stroke: var(--c);
@@ -1043,11 +1147,13 @@
     font-weight: 600;
     fill: var(--fg);
     font-family: var(--font-ui);
+    pointer-events: none;
   }
 
   .product .meta {
     text-anchor: middle;
     font-size: 9px;
+    pointer-events: none;
     fill: var(--fg-mute);
     font-family: var(--font-ui);
   }
@@ -1081,7 +1187,8 @@
     position: absolute;
     left: 12px;
     bottom: 36px;
-    max-width: min(360px, 70%);
+    z-index: 6;
+    max-width: min(360px, 55%);
     padding: 8px 12px;
     border-radius: 10px;
     background: rgba(255, 252, 247, 0.94);

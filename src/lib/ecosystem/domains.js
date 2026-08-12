@@ -10,14 +10,6 @@ export const domains = {
     color: "#2a5570",
     accent: "#3d7a9a",
   },
-  screener: {
-    id: "screener",
-    name: "CapIQ Screener",
-    shortLabel: "Screener",
-    blurb: "Core product — CapIQ universe triage (Pass/Watch), Dreams memory, Chrome ext + dashboard. Linker sheets sit alongside.",
-    color: "#1e5a5c",
-    accent: "#2d8a88",
-  },
   portfolio: {
     id: "portfolio",
     name: "Portfolio Manager",
@@ -36,19 +28,11 @@ export const domains = {
   },
   ops: {
     id: "ops",
-    name: "Side projects",
+    name: "Side tools",
     shortLabel: "Side tools",
-    blurb: "Supporting tools — Earnings calendar, factsheet, mail helper, Cost.",
-    color: "#6b3d4a",
-    accent: "#8a5262",
-  },
-  platform: {
-    id: "platform",
-    name: "Platform map",
-    shortLabel: "This map",
-    blurb: "This living map of Phoenician Intelligence over the shared AWS account.",
-    color: "#454560",
-    accent: "#5a5a78",
+    blurb: "Screener + Linker, Earnings Tracker, Factsheet, Mail Sender — everything outside Research hub, Portfolio, and Investors.",
+    color: "#1e5a5c",
+    accent: "#2d8a88",
   },
   vendor: {
     id: "vendor",

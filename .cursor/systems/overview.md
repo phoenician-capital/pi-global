@@ -38,22 +38,16 @@
 | Docs | S3 `phoenician-capital-documents` + quarantine |
 | Strategy book | Dynamo `phoenician-capital-strategy-book` ← S3 `custom/book.json` |
 
-### D — CapIQ Screener (peer product — own map box)
-
-| Piece | Runtime | Notes |
-|-------|---------|-------|
-| Screen Agent | EC2 `13.62.39.214` · PM2 `:3001–3004` · sslip HTTPS | Chrome ext + Express dashboard, Pass/Watch ~16k, Dreams — KB `projects/capiq-screen-agent/` |
-| Linker | Lightsail `63.184.47.249` · CF `/linker*` | CapIQ hyperlink injector (+ CLI qualitative) — sits in Screener cluster on the map |
-| Local DBs | SQLite on EC2 | `memory.db` + `screening.db` |
-
-### E — Ops satellites
+### D — Side tools (map box — Screener + satellites)
 
 | Product | Role |
 |---------|------|
+| CapIQ Screen Agent | EC2 `13.62.39.214` · PM2 `:3001–3004` · sslip HTTPS · Chrome ext + Dreams — KB `projects/capiq-screen-agent/` |
+| Linker | Lightsail `63.184.47.249` · CF `/linker*` — CapIQ hyperlink injector (+ CLI qualitative) |
+| Screener SQLite | `memory.db` + `screening.db` on EC2 |
 | Earnings_tracker | Lambda+Postgres calendar/summaries; CF `earnings.phoeniciancapital.com` |
 | Factsheet-Automation | Client PDF/Excel; static John's weights + FMP |
 | phoenician-mail-sender | Loopback Graph IR; twin = portal `/api/ir-mail` |
-| **pi-global** | Infra graph site Amplify `d3w0s20ak7lflk` |
 
 ## Auth (short)
 

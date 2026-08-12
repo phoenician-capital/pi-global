@@ -762,24 +762,6 @@ export const dossiers = [
     },
   },
 
-  {
-    nodeId: "pi-global",
-    project: "pi-global-app",
-    kbPath: "projects/pi-global-app/",
-    summary: "This map site. Static Amplify; no runtime vendor LLM calls.",
-    kindSkew: [
-      { kind: "binary_media", role: "static build assets" },
-      { kind: "health_ops", role: "Amplify hosting" },
-    ],
-    calls: [
-      { caller: "GHA deploy", callee: "Amplify StartDeployment", kind: "job_orchestrate", purpose: "zip → hosting", auth: "IAM github-actions-pi-global" },
-      { caller: "Browser", callee: "static _app chunks", kind: "binary_media", purpose: "ecosystem UI", auth: "public" },
-    ],
-    prompting: {
-      hasLlm: false,
-      summary: "None at runtime. Intelligence dossiers are authored from .cursor KB into src/lib/ecosystem/intelligence.js.",
-    },
-  },
 ];
 
 /** @type {Map<string, Dossier>} */

@@ -13,25 +13,24 @@ export const promptMapWorld = { w: 1400, h: 920, cx: 700, cy: 460 };
  * @type {Record<string, { x: number, y: number, ring: number }>}
  */
 export const productAnchors = {
-  // Research hub — left
-  "pi-net": { x: 380, y: 320, ring: 0 },
-  "pi-py": { x: 520, y: 260, ring: 0 },
-  screen: { x: 460, y: 420, ring: 0 },
-  "pi-fe": { x: 300, y: 420, ring: 1 },
+  // Side tools — left (Screener + satellites)
+  screen: { x: 220, y: 380, ring: 0 },
+  linker: { x: 140, y: 500, ring: 1 },
+  earnings: { x: 200, y: 220, ring: 0 },
+  factsheet: { x: 280, y: 600, ring: 1 },
+  "mail-sender": { x: 160, y: 700, ring: 1 },
+  // Research hub — center
+  "pi-net": { x: 560, y: 340, ring: 0 },
+  "pi-py": { x: 700, y: 260, ring: 0 },
+  "pi-fe": { x: 480, y: 440, ring: 1 },
   // Portfolio — right
   "pm-serve": { x: 980, y: 300, ring: 0 },
   "pm-fe": { x: 1120, y: 360, ring: 1 },
   ep: { x: 1040, y: 440, ring: 0 },
   // Investors — bottom
-  "portal-api": { x: 700, y: 680, ring: 0 },
-  "portal-web": { x: 560, y: 740, ring: 1 },
-  "portal-mobile": { x: 840, y: 740, ring: 1 },
-  // Side tools
-  earnings: { x: 240, y: 620, ring: 0 },
-  linker: { x: 1160, y: 580, ring: 0 },
-  factsheet: { x: 980, y: 780, ring: 1 },
-  "mail-sender": { x: 420, y: 800, ring: 1 },
-  "pi-global": { x: 700, y: 120, ring: 1 },
+  "portal-api": { x: 700, y: 700, ring: 0 },
+  "portal-web": { x: 560, y: 760, ring: 1 },
+  "portal-mobile": { x: 840, y: 760, ring: 1 },
 };
 
 /**

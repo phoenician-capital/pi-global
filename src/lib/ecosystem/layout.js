@@ -57,12 +57,7 @@ export function nodeVisibleAtLod(n, band, opts = {}) {
   if (hideVendors && n.domain === "vendor") return false;
   if (hideInfra && n.domain === "infra") return false;
   if (band === "far") {
-    return (
-      n.kind === "application" ||
-      n.kind === "service" ||
-      n.kind === "satellite" ||
-      n.id === "pi-global"
-    );
+    return n.kind === "application" || n.kind === "service" || n.kind === "satellite";
   }
   if (band === "mid") {
     return n.domain !== "vendor"; // apps + infra/DBs; vendors on near or when toggled
@@ -82,6 +77,8 @@ export const majorProductIds = [
 
 /** Side-project nodes — visible, but not the first story */
 export const sideProductIds = [
+  "screen",
+  "linker",
   "earnings",
   "factsheet",
   "mail-sender",
