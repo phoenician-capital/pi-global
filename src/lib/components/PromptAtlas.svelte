@@ -523,14 +523,16 @@
 
       <!-- Domain hulls -->
       <g class="hulls" opacity="0.55" pointer-events="none">
-        <ellipse cx="200" cy="460" rx="160" ry="280" class="hull ops" />
-        <text x="100" y="200" class="hull-label">Side tools</text>
-        <ellipse cx="600" cy="340" rx="200" ry="160" class="hull research" />
-        <text x="460" y="200" class="hull-label">Research hub</text>
+        <ellipse cx="170" cy="460" rx="140" ry="160" class="hull screener" />
+        <text x="90" y="320" class="hull-label">Screener</text>
+        <ellipse cx="580" cy="360" rx="220" ry="180" class="hull research" />
+        <text x="420" y="200" class="hull-label">Research hub</text>
         <ellipse cx="1040" cy="360" rx="180" ry="150" class="hull portfolio" />
         <text x="960" y="230" class="hull-label">Portfolio</text>
         <ellipse cx="700" cy="740" rx="220" ry="100" class="hull portal" />
         <text x="620" y="660" class="hull-label">Investors</text>
+        <ellipse cx="340" cy="840" rx="120" ry="70" class="hull ops" />
+        <text x="270" y="790" class="hull-label">Side tools</text>
       </g>
 
       <!-- Kinship ribbons (shared call kinds) -->
@@ -1004,8 +1006,12 @@
     fill: rgba(42, 85, 112, 0.05);
   }
 
+  .hull.screener {
+    fill: rgba(30, 90, 92, 0.08);
+  }
+
   .hull.ops {
-    fill: rgba(30, 90, 92, 0.07);
+    fill: rgba(107, 61, 74, 0.07);
   }
 
   .hull.portfolio {

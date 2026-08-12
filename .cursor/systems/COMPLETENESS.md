@@ -28,7 +28,7 @@ Audited against all **11** reference trees (incl. `capiq-screen-agent`) + pi-glo
 | PI .NET DevOps Anthropic prompts | ✅ | `phoenician-intelligence-backend/ai-prompting.md` |
 | Cross-project AI & calls atlas (UI) | ✅ | `PromptAtlas` · primary nav **AI & calls** · `intelligence.js` |
 | DD per-section calls / prompts (UI+data) | ✅ | `ddSections.js` · Product guides → DD engine → **DD sections** |
-| Side tools map box (Screener + satellites) | ✅ | `domains.ops` · Screener/Linker/Earnings/Factsheet/Mail — no “This map” node |
+| Screener own map box + Earnings in Research hub | ✅ | `domains.screener` · Earnings → `intelligence` · Side tools = Factsheet+Mail only |
 | Mobile both forks screens/services/versions | ✅ | `screens-inventory.md` |
 | Mail sender modules | ✅ | `module-map.md` |
 | Linkage / AWS / URLs / auth / CapIQ map | ✅ | `systems/*` |

@@ -6,9 +6,17 @@ export const domains = {
     id: "intelligence",
     name: "Phoenician Intelligence",
     shortLabel: "Research hub",
-    blurb: "Research shell — Diligence, Risks, control tower, and embeds into peer products.",
+    blurb: "Research shell — Diligence, Risks, Earnings Tracker embed, control tower, and PI website.",
     color: "#2a5570",
     accent: "#3d7a9a",
+  },
+  screener: {
+    id: "screener",
+    name: "CapIQ Screener",
+    shortLabel: "Screener",
+    blurb: "Core product — CapIQ universe triage (Pass/Watch), Dreams memory, Chrome ext + dashboard. Linker + Screener SQLite sit here.",
+    color: "#1e5a5c",
+    accent: "#2d8a88",
   },
   portfolio: {
     id: "portfolio",
@@ -30,9 +38,9 @@ export const domains = {
     id: "ops",
     name: "Side tools",
     shortLabel: "Side tools",
-    blurb: "Screener + Linker, Earnings Tracker, Factsheet, Mail Sender — everything outside Research hub, Portfolio, and Investors.",
-    color: "#1e5a5c",
-    accent: "#2d8a88",
+    blurb: "Small supporting tools — Factsheet Automation and Mail Sender (not Screener, not Research hub).",
+    color: "#6b3d4a",
+    accent: "#8a5262",
   },
   vendor: {
     id: "vendor",
@@ -89,9 +97,9 @@ export const businessFunctions = [
   {
     id: "earnings",
     name: "Earnings calendar",
-    blurb: "Side project — find and summarize earnings events (not the portfolio predictor).",
+    blurb: "Research-hub embed — find and summarize earnings events (not the portfolio predictor).",
     tier: "side",
-    nodeIds: ["earnings", "deepseek", "serpapi", "pi-fe"],
+    nodeIds: ["earnings", "pi-fe", "pi-net", "deepseek", "serpapi"],
   },
   {
     id: "investor",

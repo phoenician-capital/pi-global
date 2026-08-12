@@ -216,8 +216,8 @@ export const plainGuides = {
   screen: {
     title: "Screener",
     oneLiner: "Core product — CapIQ universe triage with the PM’s living framework (Pass/Watch).",
-    doesThis: "Chat and triage while working in CapIQ; remembers principles over time. Lives in the Side tools map box; also embeds inside the PI shell.",
-    doesNot: "Not Linker (hyperlinks) and not PI’s CapIQ Excel download bots — separate CapIQ consumers.",
+    doesThis: "Chat and triage while working in CapIQ; remembers principles over time. Own map box (peer to Research hub); also embeds inside the PI shell.",
+    doesNot: "Not Linker (hyperlinks) and not PI’s CapIQ Excel download bots — separate CapIQ consumers. Not a Side tool.",
     whoFor: "PM / screening workflow (browser extension + embedded dashboard in PI).",
     aiStory: "Heavy AI: chat, screen triage, auditor, memory. Partner vs Screener personas.",
     readOrder: ["What this does → activity mix → AI personas → conversation table."],
@@ -225,7 +225,7 @@ export const plainGuides = {
   linker: {
     title: "Linker",
     oneLiner: "Two tools: a web uploader that injects CapIQ hyperlinks into Excel, and a CLI that scores capital allocation.",
-    doesThis: "Web path patches workbooks. CLI path can ask Claude for a qualitative score. Lives in Side tools with Screener.",
+    doesThis: "Web path patches workbooks. CLI path can ask Claude for a qualitative score. Lives in the Screener map box.",
     doesNot: "The website linker has no AI. Not the Screener agent itself.",
     whoFor: "Analysts needing CapIQ-linked sheets; CLI for ranking runs.",
     aiStory: "AI only in the CLI qualitative step (Claude). The web uploader has no AI.",
@@ -234,9 +234,9 @@ export const plainGuides = {
   earnings: {
     title: "Earnings Tracker",
     oneLiner: "Finds earnings events on the web, summarizes them, shows a calendar dashboard.",
-    doesThis: "Scheduled scrapes + DeepSeek summaries + calendar invites.",
+    doesThis: "Scheduled scrapes + DeepSeek summaries + calendar invites. Lives in the Research hub (PI website embed).",
     doesNot: "Not EP (portfolio) — that other tool forecasts next prints for books.",
-    whoFor: "Anyone tracking IR calendars / event summaries.",
+    whoFor: "Anyone tracking IR calendars / event summaries from the research shell.",
     aiStory: "DeepSeek only (finder vs summary models).",
     readOrder: ["What this does → schedules → AI models → table."],
   },

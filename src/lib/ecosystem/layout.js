@@ -77,7 +77,6 @@ export const majorProductIds = [
 
 /** Side-project nodes — visible, but not the first story */
 export const sideProductIds = [
-  "screen",
   "linker",
   "earnings",
   "factsheet",
