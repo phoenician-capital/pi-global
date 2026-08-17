@@ -251,76 +251,76 @@
     </button>
   </div>
 
-  <div class="canvas">
-    <GalaxyMap
-      bind:this={mapRef}
-      nodes={visibleNodes}
-      edges={visibleEdges}
-      selectedId={selectedId}
-      selectedEdgeId={null}
-      highlightNodes={new Set()}
-      highlightEdges={new Set()}
-      dimUnrelated={false}
-      journeyStepIds={[]}
-      animateFlow={false}
-      onselectnode={onSelectNode}
-    />
-  </div>
-
-  {#if showAiSummary}
-    <button
-      type="button"
-      class="scrim"
-      onclick={() => (showAiSummary = false)}
-      aria-label="Close AI usage summary"
-    ></button>
-    <div class="ai-summary">
-      <button type="button" class="close" onclick={() => (showAiSummary = false)} aria-label="Close AI usage summary"
-        >×</button
-      >
-      <h3>AI usage across {activeFilters.size === ORDER.length ? "every pipeline" : "the selected pipelines"}</h3>
-      {#each aiSummary as group (group.provider)}
-        <div class="provider-group" style:--pv={group.color}>
-          <p class="provider-head">
-            <span class="provider-dot"></span>{group.label}
-            <span class="provider-count">used by {group.items.length} stage{group.items.length === 1 ? "" : "s"}</span>
-          </p>
-          <ul>
-            {#each group.items as item (item.stageId)}
-              <li>
-                <button type="button" onclick={() => jumpToStage(item.stageId)}>
-                  <span class="item-product">{item.product}</span>
-                  <span class="item-stage">{item.stageName}</span>
-                  {#if item.model}<span class="item-model">{item.model}</span>{/if}
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </div>
-      {/each}
-    </div>
-  {/if}
-
-  {#if selectedStage && selectedPipeline}
-    <button type="button" class="scrim" onclick={() => (selectedId = null)} aria-label="Close detail"></button>
-    <div class="detail" style:--pv={PROVIDER_COLORS[selectedPv] ?? PROVIDER_COLORS.none}>
-      <button type="button" class="close" onclick={() => (selectedId = null)} aria-label="Close detail">×</button>
-      <p class="detail-eyebrow" style:color={ACCENTS[selectedPipeline.id]}>
-        {selectedPipeline.product} · Stage {selectedStageIdx + 1} of {selectedPipeline.stages.length}
-      </p>
-      <div class="detail-top">
-        <h3>{selectedStage.name}</h3>
-        <span class="ai-badge">{selectedStage.ai?.model ?? PROVIDER_LABELS[selectedPv]}</span>
+  <div class="body">
+    {#if showAiSummary}
+      <div class="ai-summary">
+        <button
+          type="button"
+          class="close"
+          onclick={() => (showAiSummary = false)}
+          aria-label="Close AI usage summary">×</button
+        >
+        <h3>AI usage across {activeFilters.size === ORDER.length ? "every pipeline" : "the selected pipelines"}</h3>
+        {#each aiSummary as group (group.provider)}
+          <div class="provider-group" style:--pv={group.color}>
+            <p class="provider-head">
+              <span class="provider-dot"></span>{group.label}
+              <span class="provider-count"
+                >used by {group.items.length} stage{group.items.length === 1 ? "" : "s"}</span
+              >
+            </p>
+            <ul>
+              {#each group.items as item (item.stageId)}
+                <li>
+                  <button type="button" onclick={() => jumpToStage(item.stageId)}>
+                    <span class="item-product">{item.product}</span>
+                    <span class="item-stage">{item.stageName}</span>
+                    {#if item.model}<span class="item-model">{item.model}</span>{/if}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/each}
       </div>
-      <p class="desc">{selectedStage.description}</p>
-      {#if selectedStage.ai?.note}
-        <p class="ai-note">{selectedStage.ai.note}</p>
-      {/if}
-      {#if selectedStage.triggeredBy}
-        <p class="trigger"><span>Starts when</span> {selectedStage.triggeredBy}</p>
-      {/if}
+    {/if}
+
+    <div class="canvas">
+      <GalaxyMap
+        bind:this={mapRef}
+        nodes={visibleNodes}
+        edges={visibleEdges}
+        selectedId={selectedId}
+        selectedEdgeId={null}
+        highlightNodes={new Set()}
+        highlightEdges={new Set()}
+        dimUnrelated={false}
+        journeyStepIds={[]}
+        animateFlow={false}
+        onselectnode={onSelectNode}
+      />
     </div>
-  {/if}
+
+    {#if selectedStage && selectedPipeline}
+      <div class="detail" style:--pv={PROVIDER_COLORS[selectedPv] ?? PROVIDER_COLORS.none}>
+        <button type="button" class="close" onclick={() => (selectedId = null)} aria-label="Close detail">×</button>
+        <p class="detail-eyebrow" style:color={ACCENTS[selectedPipeline.id]}>
+          {selectedPipeline.product} · Stage {selectedStageIdx + 1} of {selectedPipeline.stages.length}
+        </p>
+        <div class="detail-top">
+          <h3>{selectedStage.name}</h3>
+          <span class="ai-badge">{selectedStage.ai?.model ?? PROVIDER_LABELS[selectedPv]}</span>
+        </div>
+        <p class="desc">{selectedStage.description}</p>
+        {#if selectedStage.ai?.note}
+          <p class="ai-note">{selectedStage.ai.note}</p>
+        {/if}
+        {#if selectedStage.triggeredBy}
+          <p class="trigger"><span>Starts when</span> {selectedStage.triggeredBy}</p>
+        {/if}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -418,36 +418,31 @@
     flex-shrink: 0;
   }
 
+  .body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
   .canvas {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     position: relative;
   }
 
-  /* ── Detail panel ─────────────────────────────────────────────────── */
-  .scrim {
-    position: absolute;
-    inset: 0;
-    background: transparent;
-    z-index: 5;
-    border: none;
-    cursor: default;
-  }
-
+  /* ── Detail panel — a docked sibling, not an overlay, so it never covers
+     the node it's describing ───────────────────────────────────────── */
   .detail {
     --pv: #8a6bd6;
-    position: absolute;
-    right: 16px;
-    top: 16px;
-    bottom: 16px;
-    width: min(360px, calc(100% - 32px));
+    flex-shrink: 0;
+    width: 320px;
+    height: 100%;
     overflow-y: auto;
     padding: 18px 20px;
-    border-radius: 12px;
     background: color-mix(in srgb, var(--pv) 6%, #fffcf6);
-    border: 1px solid color-mix(in srgb, var(--pv) 32%, var(--panel-border));
-    box-shadow: 0 18px 40px rgba(40, 32, 20, 0.2);
-    z-index: 6;
+    border-left: 1px solid color-mix(in srgb, var(--pv) 32%, var(--panel-border));
+    position: relative;
   }
 
   .close {
@@ -536,20 +531,16 @@
     margin-right: 6px;
   }
 
-  /* ── AI usage summary panel ──────────────────────────────────────── */
+  /* ── AI usage summary panel — also a docked sibling of the canvas ─── */
   .ai-summary {
-    position: absolute;
-    left: 16px;
-    top: 16px;
-    bottom: 16px;
-    width: min(340px, calc(100% - 32px));
+    position: relative;
+    flex-shrink: 0;
+    width: 300px;
+    height: 100%;
     overflow-y: auto;
     padding: 18px 18px 14px;
-    border-radius: 12px;
     background: #fffcf6;
-    border: 1px solid var(--panel-border);
-    box-shadow: 0 18px 40px rgba(40, 32, 20, 0.2);
-    z-index: 6;
+    border-right: 1px solid var(--panel-border);
   }
 
   .ai-summary h3 {
@@ -647,22 +638,30 @@
       padding: 10px 12px;
     }
 
-    .detail {
-      right: 8px;
-      left: 8px;
-      top: auto;
-      bottom: 8px;
+    .body {
+      flex-direction: column;
+    }
+
+    .canvas {
+      min-height: 160px;
+    }
+
+    .detail,
+    .ai-summary {
       width: auto;
-      max-height: 65%;
+      height: auto;
+      max-height: 42vh;
+      flex-shrink: 0;
+    }
+
+    .detail {
+      border-left: none;
+      border-top: 1px solid color-mix(in srgb, var(--pv) 32%, var(--panel-border));
     }
 
     .ai-summary {
-      left: 8px;
-      right: 8px;
-      top: 8px;
-      bottom: auto;
-      width: auto;
-      max-height: 70%;
+      border-right: none;
+      border-bottom: 1px solid var(--panel-border);
     }
   }
 </style>
