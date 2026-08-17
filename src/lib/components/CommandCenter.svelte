@@ -494,7 +494,9 @@
     <div class="brand">
       <p class="eyebrow">Phoenician Capital · IT</p>
       <h1>{meta.title}</h1>
-      {#if view !== "intelligence" && view !== "prompts"}
+      {#if view === "intelligence"}
+        <p class="lede">A plain-English guide to every tool we use — pick one on the left to see what it does.</p>
+      {:else if view !== "prompts"}
         <p class="lede">{meta.subtitle}</p>
       {/if}
     </div>
@@ -555,14 +557,8 @@
     {#if view === "intelligence"}
       <IntelligenceDesk
         selectedId={selectedId}
-        initialTab={deskInitialTab}
         onselect={(id) => {
           selectedId = id;
-        }}
-        onshowmap={showOnMap}
-        onatlas={(id) => {
-          selectedId = id;
-          view = "prompts";
         }}
       />
     {:else if view === "prompts"}

@@ -1,47 +1,32 @@
 <script>
-  import DossierView from "./DossierView.svelte";
-  import DdSectionsPanel from "./DdSectionsPanel.svelte";
-  import {
-    dossierFor,
-    intelligenceProjects,
-    searchIntelligence,
-  } from "$lib/ecosystem/intelligence.js";
-  import { guideFor, aiBadge, plainForKind } from "$lib/ecosystem/plainGuide.js";
+  import { dossierFor, intelligenceProjects } from "$lib/ecosystem/intelligence.js";
+  import { guideFor } from "$lib/ecosystem/plainGuide.js";
   import { coreGuideNodeIds, domains, nodeById } from "$lib/ecosystem/index.js";
 
   /**
    * @type {{
    *   selectedId: string|null,
-   *   initialTab?: 'overview'|'calls'|'prompts'|'sections'|null,
    *   onselect: (id: string) => void,
-   *   onshowmap?: (id: string) => void,
-   *   onatlas?: (id: string) => void,
    * }}
    */
-  let { selectedId = null, initialTab = null, onselect, onshowmap, onatlas } = $props();
+  let { selectedId = null, onselect } = $props();
 
-  let deskTab = $state(/** @type {'overview'|'calls'|'prompts'|'sections'} */ ("overview"));
   let q = $state("");
-  let llmOnly = $state(false);
-  let appliedInitial = $state(/** @type {string|null} */ (null));
 
   const projects = $derived(
     intelligenceProjects().map((p) => {
       const g = guideFor(p.nodeId);
-      const d = dossierFor(p.nodeId);
       return {
         ...p,
         title: g?.title ?? p.project,
         oneLiner: g?.oneLiner ?? p.summary,
         domain: nodeById.get(p.nodeId)?.domain,
-        kindSkew: d?.kindSkew ?? [],
       };
     }),
   );
 
   const filtered = $derived(
     projects.filter((p) => {
-      if (llmOnly && !p.hasLlm) return false;
       if (!q.trim()) return true;
       const hay = `${p.title} ${p.oneLiner} ${p.project} ${p.summary}`.toLowerCase();
       return hay.includes(q.trim().toLowerCase());
@@ -51,57 +36,29 @@
   const coreSet = new Set(coreGuideNodeIds);
   const coreFiltered = $derived(filtered.filter((p) => coreSet.has(p.nodeId)));
   const moreFiltered = $derived(filtered.filter((p) => !coreSet.has(p.nodeId)));
-  const showSections = $derived(!q.trim() && !llmOnly);
+  const showSections = $derived(!q.trim());
 
   const activeId = $derived(selectedId && dossierFor(selectedId) ? selectedId : filtered[0]?.nodeId ?? null);
-  const dossier = $derived(activeId ? dossierFor(activeId) : null);
   const guide = $derived(activeId ? guideFor(activeId) : null);
   const activeNode = $derived(activeId ? nodeById.get(activeId) : null);
-  const intelHits = $derived(q.trim().length >= 2 ? searchIntelligence(q).slice(0, 6) : []);
-  const isDdEngine = $derived(activeId === "pi-py");
 
-  const previewCalls = $derived((dossier?.calls ?? []).slice(0, 8));
-  const previewModels = $derived((dossier?.prompting.models ?? []).slice(0, 6));
-  const previewFrags = $derived((dossier?.prompting.fragments ?? []).slice(0, 4));
-
-  /** @param {string} id @param {'overview'|'calls'|'prompts'|'sections'} [tab] */
-  function pick(id, tab = "overview") {
+  /** @param {string} id */
+  function pick(id) {
     onselect(id);
-    if (tab === "sections" && id !== "pi-py") deskTab = "overview";
-    else deskTab = tab;
   }
-
-  $effect(() => {
-    if (deskTab === "sections" && activeId !== "pi-py") deskTab = "overview";
-  });
-
-  $effect(() => {
-    if (!initialTab || initialTab === appliedInitial) return;
-    if (initialTab === "sections" && selectedId !== "pi-py") return;
-    deskTab = initialTab;
-    appliedInitial = initialTab;
-  });
 </script>
 
-{#snippet productRow(p)}
-  {@const badge = aiBadge(p.hasLlm)}
+{#snippet productRow(/** @type {{ nodeId: string, title: string, oneLiner: string }} */ p)}
   <li>
     <button
       type="button"
       class:active={activeId === p.nodeId}
-      onclick={() => pick(p.nodeId, "overview")}
+      onclick={() => pick(p.nodeId)}
     >
       <span class="row-top">
         <span class="name">{p.title}</span>
-        <span class="badge" class:llm={badge.tone === "llm"}>{p.hasLlm ? "AI" : "—"}</span>
       </span>
       <span class="one">{p.oneLiner}</span>
-      <span class="meta">
-        <em>{p.callCount} calls</em>
-        {#if p.hasLlm}
-          <i>{p.modelCount} models</i>
-        {/if}
-      </span>
     </button>
   </li>
 {/snippet}
@@ -109,35 +66,8 @@
 <div class="desk">
   <aside class="rail">
     <div class="rail-tools">
-      <input type="search" placeholder="Search products, models, calls…" bind:value={q} />
-      <label class="toggle" title="Only products that call an AI model">
-        <input type="checkbox" bind:checked={llmOnly} />
-        AI only
-      </label>
+      <input type="search" placeholder="Search products…" bind:value={q} />
     </div>
-
-    {#if intelHits.length}
-      <div class="hits">
-        {#each intelHits as h}
-          <button
-            type="button"
-            class="hit"
-            onclick={() =>
-              pick(
-                h.nodeId,
-                h.kind === "prompt" || h.kind === "model" || h.kind === "prompt-service"
-                  ? "prompts"
-                  : h.kind === "call"
-                    ? "calls"
-                    : "overview",
-              )}
-          >
-            <span class="hit-kind">{h.kind === "call" ? "Call" : h.kind === "model" ? "Model" : h.kind === "prompt" ? "Rule" : "Product"}</span>
-            <strong>{h.title}</strong>
-          </button>
-        {/each}
-      </div>
-    {/if}
 
     <ul class="plist">
       {#if showSections && coreFiltered.length}
@@ -160,196 +90,40 @@
   </aside>
 
   <section class="main">
-    {#if dossier && guide}
+    {#if guide}
       <header class="main-head">
         <div class="title-block">
-          <p class="eyebrow">
-            {domains[activeNode?.domain ?? ""]?.shortLabel ?? "Product"}
-            · {dossier.calls.length} connections
-            {#if dossier.prompting.hasLlm}
-              · {dossier.prompting.models?.length ?? 0} model roles
-            {:else}
-              · no AI
-            {/if}
-          </p>
+          <p class="eyebrow">{domains[activeNode?.domain ?? ""]?.shortLabel ?? "Product"}</p>
           <div class="title-row">
             <h2>{guide.title}</h2>
             <p class="tagline">{guide.oneLiner}</p>
           </div>
         </div>
-        <div class="head-actions">
-          <div class="tabs" role="tablist">
-            <button type="button" class:on={deskTab === "overview"} onclick={() => (deskTab = "overview")}>
-              Overview
-            </button>
-            {#if isDdEngine}
-              <button type="button" class:on={deskTab === "sections"} onclick={() => (deskTab = "sections")}>
-                DD sections
-              </button>
-            {/if}
-            <button type="button" class:on={deskTab === "calls"} onclick={() => (deskTab = "calls")}>
-              Talks to
-            </button>
-            <button type="button" class:on={deskTab === "prompts"} onclick={() => (deskTab = "prompts")}>
-              AI
-            </button>
-          </div>
-          <div class="head-links">
-            {#if onshowmap && activeId}
-              <button type="button" class="text-cta" onclick={() => onshowmap(activeId)}>Map</button>
-            {/if}
-            {#if onatlas && activeId}
-              <button type="button" class="text-cta" onclick={() => onatlas(activeId)}>AI atlas</button>
-            {/if}
-          </div>
-        </div>
       </header>
 
       <div class="main-body">
-        {#if deskTab === "sections" && isDdEngine}
-          <DdSectionsPanel />
-        {:else if deskTab === "overview"}
-          <div class="overview">
-            <div class="fact-strip">
-              <div>
-                <h3>Does</h3>
-                <p>{guide.doesThis}</p>
-              </div>
-              {#if guide.doesNot}
-                <div class="warn">
-                  <h3>Don’t confuse</h3>
-                  <p>{guide.doesNot}</p>
-                </div>
-              {/if}
-              <div>
-                <h3>Who</h3>
-                <p>{guide.whoFor}</p>
-              </div>
-              <div class:ai={dossier.prompting.hasLlm}>
-                <h3>AI</h3>
-                <p>{guide.aiStory}</p>
-              </div>
+        <div class="overview">
+          <div class="fact-strip">
+            <div>
+              <h3>Does</h3>
+              <p>{guide.doesThis}</p>
             </div>
-
-            {#if dossier.kindSkew?.length}
-              <div class="band">
-                <div class="band-head">
-                  <h3>Activity mix</h3>
-                  <button type="button" class="text-cta" onclick={() => (deskTab = "calls")}>All connections →</button>
-                </div>
-                <div class="skew">
-                  {#each dossier.kindSkew as k}
-                    {@const plain = plainForKind(k.kind)}
-                    <button
-                      type="button"
-                      class="skew-chip"
-                      style:--accent={plain.color}
-                      title={plain.plain}
-                      onclick={() => (deskTab = "calls")}
-                    >
-                      <strong>{plain.label}</strong>
-                      {#if k.count !== undefined}<em>{k.count}</em>{/if}
-                    </button>
-                  {/each}
-                </div>
+            {#if guide.doesNot}
+              <div class="warn">
+                <h3>Don’t confuse</h3>
+                <p>{guide.doesNot}</p>
               </div>
             {/if}
-
-            {#if isDdEngine}
-              <div class="band dd-cta">
-                <div class="band-head">
-                  <h3>DD sections · per-section calls</h3>
-                  <button type="button" class="text-cta" onclick={() => (deskTab = "sections")}>
-                    Open full section map →
-                  </button>
-                </div>
-                <p class="dd-hint">
-                  Production order §2→3→4→5→6→7→8→9→10→12→1→11 — templates, models, RAG/web/CapIQ calls for each section, plus CJA / UE-DCF / RFW / ACS / H2H / Risk.
-                </p>
-              </div>
-            {/if}
-
-            <div class="split-panels">
-              <div class="panel">
-                <div class="band-head">
-                  <h3>Talks to (top)</h3>
-                  <button type="button" class="text-cta" onclick={() => (deskTab = "calls")}>
-                    {dossier.calls.length} total →
-                  </button>
-                </div>
-                <div class="mini-table">
-                  <table>
-                    <thead>
-                      <tr><th>Activity</th><th>Why</th><th>To</th></tr>
-                    </thead>
-                    <tbody>
-                      {#each previewCalls as c}
-                        {@const plain = plainForKind(c.kind)}
-                        <tr>
-                          <td><span class="kind" style:--accent={plain.color}>{plain.label}</span></td>
-                          <td>{c.purpose}</td>
-                          <td class="mono">{c.callee}</td>
-                        </tr>
-                      {:else}
-                        <tr><td colspan="3" class="empty-cell">No connections listed.</td></tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="panel">
-                <div class="band-head">
-                  <h3>{dossier.prompting.hasLlm ? "Models & rules" : "AI"}</h3>
-                  <button type="button" class="text-cta" onclick={() => (deskTab = "prompts")}>
-                    Full AI →
-                  </button>
-                </div>
-                {#if dossier.prompting.hasLlm}
-                  <p class="ai-sum">{dossier.prompting.summary}</p>
-                  {#if previewModels.length}
-                    <div class="mini-table">
-                      <table>
-                        <thead>
-                          <tr><th>Job</th><th>Model</th></tr>
-                        </thead>
-                        <tbody>
-                          {#each previewModels as m}
-                            <tr>
-                              <td>{m.role}</td>
-                              <td class="mono gold">{m.model}</td>
-                            </tr>
-                          {/each}
-                        </tbody>
-                      </table>
-                    </div>
-                  {/if}
-                  {#if previewFrags.length}
-                    <ul class="frags">
-                      {#each previewFrags as f}
-                        <li>{f.instruction}</li>
-                      {/each}
-                    </ul>
-                  {/if}
-                {:else}
-                  <p class="ai-sum">{dossier.prompting.summary}</p>
-                  <p class="hint">This product still has connections — open Talks to for the full table.</p>
-                {/if}
-              </div>
+            <div>
+              <h3>Who</h3>
+              <p>{guide.whoFor}</p>
+            </div>
+            <div>
+              <h3>AI</h3>
+              <p>{guide.aiStory}</p>
             </div>
           </div>
-        {:else}
-          <DossierView
-            {dossier}
-            pane={deskTab === "calls" ? "calls" : "prompts"}
-            hideHero
-            compact
-          />
-        {/if}
-      </div>
-    {:else if dossier}
-      <div class="main-body">
-        <DossierView {dossier} pane="both" compact />
+        </div>
       </div>
     {:else}
       <div class="empty">Choose a product on the left.</div>

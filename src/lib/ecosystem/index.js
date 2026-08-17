@@ -41,9 +41,9 @@ export { blastLayers, animateValues } from "./motion.js";
 
 /** Full view catalog (palette / deep links). Main chrome only shows `primaryViews`. */
 export const views = [
-  { id: "architecture", name: "Map", hint: "See every product and how they connect", primary: true },
+  { id: "architecture", name: "Map", hint: "See every product and how they connect", primary: false },
   { id: "intelligence", name: "Product guides", hint: "Plain English: what each product does", primary: true },
-  { id: "prompts", name: "AI & calls", hint: "Every prompt job, model, and connection type", primary: true },
+  { id: "prompts", name: "AI & calls", hint: "Every prompt job, model, and connection type", primary: false },
   { id: "journey", name: "Walkthroughs", hint: "Follow a real workflow step by step", primary: true },
   { id: "impact", name: "Impact", hint: "What breaks if this piece fails", primary: false },
   { id: "project", name: "Products only", hint: "Hide databases and vendors", primary: false },
