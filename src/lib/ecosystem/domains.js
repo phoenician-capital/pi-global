@@ -66,7 +66,7 @@ export const domains = {
     name: "DD Pipeline",
     shortLabel: "DD",
     blurb: "Due-diligence report generation, stage by stage.",
-    color: "#f0b429",
+    color: "#8a6410",
     accent: "#f0b429",
   },
   "pipe-dcf": {
@@ -74,7 +74,7 @@ export const domains = {
     name: "DCF Pipeline",
     shortLabel: "DCF",
     blurb: "The valuation engine embedded inside the DD report.",
-    color: "#ff9a52",
+    color: "#a8501a",
     accent: "#ff9a52",
   },
   "pipe-screening": {
@@ -82,7 +82,7 @@ export const domains = {
     name: "Screening Pipeline",
     shortLabel: "Screening",
     blurb: "Chat, memory, playbooks, and the skills that vote Pass/Watch.",
-    color: "#2dd4bf",
+    color: "#0e7d6f",
     accent: "#2dd4bf",
   },
   "pipe-portfolio": {
@@ -90,7 +90,7 @@ export const domains = {
     name: "Portfolio Pipeline",
     shortLabel: "Portfolio",
     blurb: "Research intake through to a published, live-tracked book.",
-    color: "#4fa8ff",
+    color: "#1f5f9e",
     accent: "#4fa8ff",
   },
   "pipe-ep": {
@@ -98,7 +98,7 @@ export const domains = {
     name: "EP (Earnings Preview)",
     shortLabel: "EP",
     blurb: "Earnings-surprise preview, walled off from portfolio weights.",
-    color: "#b18cff",
+    color: "#5c3a9e",
     accent: "#b18cff",
   },
   "pipe-earnings": {
@@ -106,7 +106,7 @@ export const domains = {
     name: "Earnings Pipeline",
     shortLabel: "Earnings",
     blurb: "Scrape, discover, summarize, and surface earnings events.",
-    color: "#ff6f91",
+    color: "#a83355",
     accent: "#ff6f91",
   },
 };
