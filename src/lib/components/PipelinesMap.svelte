@@ -44,6 +44,7 @@
 
   const ORDER = ["dd", "dcf", "screening", "portfolio", "ep", "earnings"];
   const orderedPipelines = ORDER.map((id) => pipelines.find((p) => p.id === id)).filter((p) => !!p);
+  const PROVIDER_ORDER = ["claude", "openai", "gemini", "deepseek", "perplexity", "mixed", "none"];
 
   let activeFilters = $state(new Set(ORDER));
 
@@ -184,6 +185,40 @@
     return selectedPipeline.stages[selectedStageIdx] ?? null;
   });
   const selectedPv = $derived(selectedStage?.ai?.provider ?? "none");
+
+  // ── "Claude is used by…" / "OpenAI is used by…" summary, grouped by provider ──
+  let showAiSummary = $state(false);
+
+  const aiSummary = $derived.by(() => {
+    /** @type {Record<string, Array<{ stageId: string, product: string, stageName: string, model: string }>>} */
+    const byProvider = {};
+    for (const p of orderedPipelines) {
+      if (!activeFilters.has(p.id)) continue;
+      p.stages.forEach((s, i) => {
+        const provider = s.ai?.provider ?? "none";
+        const list = byProvider[provider] ?? (byProvider[provider] = []);
+        list.push({
+          stageId: `${p.id}-${i}`,
+          product: p.product,
+          stageName: s.name,
+          model: s.ai?.model ?? "",
+        });
+      });
+    }
+    return PROVIDER_ORDER.filter((prov) => byProvider[prov]?.length).map((prov) => ({
+      provider: prov,
+      label: PROVIDER_LABELS[prov],
+      color: PROVIDER_COLORS[prov],
+      items: byProvider[prov],
+    }));
+  });
+
+  /** @param {string} stageId */
+  function jumpToStage(stageId) {
+    selectedId = stageId;
+    showAiSummary = false;
+    queueMicrotask(() => mapRef?.fitSelection());
+  }
 </script>
 
 <div class="pmap">
@@ -206,6 +241,14 @@
         </button>
       {/each}
     </div>
+    <button
+      type="button"
+      class="ai-summary-toggle"
+      class:active={showAiSummary}
+      onclick={() => (showAiSummary = !showAiSummary)}
+    >
+      AI usage
+    </button>
   </div>
 
   <div class="canvas">
@@ -223,6 +266,40 @@
       onselectnode={onSelectNode}
     />
   </div>
+
+  {#if showAiSummary}
+    <button
+      type="button"
+      class="scrim"
+      onclick={() => (showAiSummary = false)}
+      aria-label="Close AI usage summary"
+    ></button>
+    <div class="ai-summary">
+      <button type="button" class="close" onclick={() => (showAiSummary = false)} aria-label="Close AI usage summary"
+        >×</button
+      >
+      <h3>AI usage across {activeFilters.size === ORDER.length ? "every pipeline" : "the selected pipelines"}</h3>
+      {#each aiSummary as group (group.provider)}
+        <div class="provider-group" style:--pv={group.color}>
+          <p class="provider-head">
+            <span class="provider-dot"></span>{group.label}
+            <span class="provider-count">used by {group.items.length} stage{group.items.length === 1 ? "" : "s"}</span>
+          </p>
+          <ul>
+            {#each group.items as item (item.stageId)}
+              <li>
+                <button type="button" onclick={() => jumpToStage(item.stageId)}>
+                  <span class="item-product">{item.product}</span>
+                  <span class="item-stage">{item.stageName}</span>
+                  {#if item.model}<span class="item-model">{item.model}</span>{/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/each}
+    </div>
+  {/if}
 
   {#if selectedStage && selectedPipeline}
     <button type="button" class="scrim" onclick={() => (selectedId = null)} aria-label="Close detail"></button>
@@ -261,6 +338,10 @@
   }
 
   .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--line);
     flex-shrink: 0;
@@ -271,6 +352,30 @@
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+  }
+
+  .ai-summary-toggle {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--fg-mute);
+    white-space: nowrap;
+  }
+
+  .ai-summary-toggle:hover {
+    color: var(--fg);
+    border-color: var(--gold);
+  }
+
+  .ai-summary-toggle.active {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--gold) 14%, var(--panel));
+    border-color: var(--gold);
   }
 
   .chip {
@@ -431,8 +536,114 @@
     margin-right: 6px;
   }
 
+  /* ── AI usage summary panel ──────────────────────────────────────── */
+  .ai-summary {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    bottom: 16px;
+    width: min(340px, calc(100% - 32px));
+    overflow-y: auto;
+    padding: 18px 18px 14px;
+    border-radius: 12px;
+    background: #fffcf6;
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 18px 40px rgba(40, 32, 20, 0.2);
+    z-index: 6;
+  }
+
+  .ai-summary h3 {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--fg);
+    margin: 0 26px 14px 0;
+    line-height: 1.4;
+  }
+
+  .provider-group {
+    --pv: #8a6a2f;
+    margin-bottom: 16px;
+  }
+
+  .provider-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .provider-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 6px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--pv) 78%, black);
+  }
+
+  .provider-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--pv);
+    flex-shrink: 0;
+  }
+
+  .provider-count {
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--fg-mute);
+  }
+
+  .provider-group ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 15px;
+    border-left: 2px solid color-mix(in srgb, var(--pv) 28%, transparent);
+  }
+
+  .provider-group li {
+    margin: 0 0 2px;
+  }
+
+  .provider-group li button {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 5px 8px;
+    border-radius: 7px;
+    text-align: left;
+  }
+
+  .provider-group li button:hover {
+    background: color-mix(in srgb, var(--pv) 10%, transparent);
+  }
+
+  .item-product {
+    font-family: var(--font-ui);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+  }
+
+  .item-stage {
+    font-size: 12.5px;
+    color: var(--fg);
+    line-height: 1.4;
+  }
+
+  .item-model {
+    font-size: 10.5px;
+    color: var(--fg-mute);
+    font-style: italic;
+  }
+
   @media (max-width: 760px) {
     .toolbar {
+      flex-wrap: wrap;
       padding: 10px 12px;
     }
 
@@ -443,6 +654,15 @@
       bottom: 8px;
       width: auto;
       max-height: 65%;
+    }
+
+    .ai-summary {
+      left: 8px;
+      right: 8px;
+      top: 8px;
+      bottom: auto;
+      width: auto;
+      max-height: 70%;
     }
   }
 </style>
