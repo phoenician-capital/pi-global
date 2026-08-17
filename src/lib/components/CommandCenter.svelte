@@ -6,6 +6,7 @@
   import IntelligenceDesk from "./IntelligenceDesk.svelte";
   import PromptAtlas from "./PromptAtlas.svelte";
   import JourneyRail from "./JourneyRail.svelte";
+  import PipelinesDesk from "./PipelinesDesk.svelte";
   import {
     blastLayers,
     blastRadius,
@@ -35,6 +36,7 @@
   let view = $state(/** @type {ViewId} */ ("intelligence"));
   let selectedId = $state(/** @type {string|null} */ (null));
   let selectedEdgeId = $state(/** @type {string|null} */ (null));
+  let pipelineId = $state(/** @type {string|null} */ (null));
   let journeyId = $state(journeys[0]?.id ?? "");
   let businessId = $state(businessFunctions[0]?.id ?? "");
   let layerFilter = $state("");
@@ -489,13 +491,15 @@
   }
 </script>
 
-<div class="shell" class:compact={view === "intelligence" || view === "prompts"}>
+<div class="shell" class:compact={view === "intelligence" || view === "prompts" || view === "pipeline"}>
   <header class="top">
     <div class="brand">
       <p class="eyebrow">Phoenician Capital · IT</p>
       <h1>{meta.title}</h1>
       {#if view === "intelligence"}
         <p class="lede">A plain-English guide to every tool we use — pick one on the left to see what it does.</p>
+      {:else if view === "pipeline"}
+        <p class="lede">How each product's workflow actually runs, stage by stage — and where it could be improved.</p>
       {:else if view !== "prompts"}
         <p class="lede">{meta.subtitle}</p>
       {/if}
@@ -551,7 +555,7 @@
 
   <main
     class="stage"
-    class:desk={view === "intelligence" || view === "prompts"}
+    class:desk={view === "intelligence" || view === "prompts" || view === "pipeline"}
     class:journey={view === "journey"}
   >
     {#if view === "intelligence"}
@@ -559,6 +563,13 @@
         selectedId={selectedId}
         onselect={(id) => {
           selectedId = id;
+        }}
+      />
+    {:else if view === "pipeline"}
+      <PipelinesDesk
+        selectedId={pipelineId}
+        onselect={(id) => {
+          pipelineId = id;
         }}
       />
     {:else if view === "prompts"}
