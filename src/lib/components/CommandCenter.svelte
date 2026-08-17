@@ -33,6 +33,21 @@
 
   /** @typedef {import('$lib/ecosystem/index.js').ViewId} ViewId */
 
+  /**
+   * Pipelines surfaces exact AI-vendor usage and known security gaps — restricted to
+   * these two people specifically, NOT to "anyone with DEVELOPER role" the way the
+   * Architecture tab itself is gated one level up. pi-global has no identity of its
+   * own; the parent PI app passes it via ?viewer= when embedding.
+   */
+  const PIPELINE_ALLOWED_VIEWERS = ["rr@phoeniciancapital.com", "jk@phoeniciancapital.com"];
+  const currentViewer =
+    typeof location !== "undefined"
+      ? (new URLSearchParams(location.search).get("viewer") || "").trim().toLowerCase()
+      : "";
+  const canViewPipelines = PIPELINE_ALLOWED_VIEWERS.includes(currentViewer);
+
+  const visiblePrimaryViews = primaryViews.filter((v) => v.id !== "pipeline" || canViewPipelines);
+
   let view = $state(/** @type {ViewId} */ ("intelligence"));
   let selectedId = $state(/** @type {string|null} */ (null));
   let selectedEdgeId = $state(/** @type {string|null} */ (null));
@@ -471,7 +486,7 @@
 
   function switchView(/** @type {ViewId} */ id) {
     stopPlay();
-    view = id;
+    view = id === "pipeline" && !canViewPipelines ? "architecture" : id;
     if (id !== "impact" && id !== "journey") {
       if (id !== "architecture" || !isolate) {
         // keep selection, clear heavy highlights unless focusing
@@ -513,7 +528,7 @@
 
   <nav class="views" aria-label="Main views">
     <div class="views-desktop">
-      {#each primaryViews as v}
+      {#each visiblePrimaryViews as v}
         <button
           class:active={view === v.id}
           onclick={() => switchView(/** @type {ViewId} */ (v.id))}
@@ -527,7 +542,7 @@
       <FancySelect
         label="View"
         bind:value={view}
-        options={primaryViews.map((v) => ({ value: v.id, label: v.name, hint: v.hint }))}
+        options={visiblePrimaryViews.map((v) => ({ value: v.id, label: v.name, hint: v.hint }))}
         onchange={(id) => switchView(/** @type {ViewId} */ (id))}
         wide
       />

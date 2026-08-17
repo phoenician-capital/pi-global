@@ -27,6 +27,9 @@
    *   animateFlow?: boolean,
    *   focusedDomain?: string|null,
    *   controlsOffset?: number,
+   *   onselectnode?: (id: string) => void,
+   *   onselectedge?: (id: string) => void,
+   *   ondomain?: (id: string) => void,
    * }}
    */
   let {
@@ -84,10 +87,21 @@
     showEdgeLabels || (band === "near" && (hasHighlight || journeyStepIds.length > 0 || !!hoveredEdge)),
   );
 
+  /**
+   * Falls back to the passed-in `nodes` prop for ids the global ecosystem
+   * registry doesn't know about — lets this component render a synthetic
+   * graph (e.g. Pipelines) without polluting the real node registry.
+   */
+  const localNodeById = $derived(new Map(nodes.map((n) => [n.id, n])));
+  /** @param {string} id */
+  function resolveNode(id) {
+    return nodeById.get(id) ?? localNodeById.get(id);
+  }
+
   /** @param {string} id */
   function posOf(id) {
     const o = positionOverrides?.get(id);
-    const n = nodeById.get(id);
+    const n = resolveNode(id);
     if (!n) return null;
     return { x: o?.x ?? n.x, y: o?.y ?? n.y, r: n.r ?? 20, node: n };
   }
@@ -432,7 +446,7 @@
   function hoverNode(id, ev) {
     hoveredNode = id;
     hoveredEdge = null;
-    const n = nodeById.get(id);
+    const n = resolveNode(id);
     if (!n || !svgEl) return;
     const rect = svgEl.getBoundingClientRect();
     const g = guideFor(id);
@@ -452,8 +466,8 @@
     const e = edges.find((x) => x.id === id);
     if (!e || !svgEl) return;
     const rect = svgEl.getBoundingClientRect();
-    const a = nodeById.get(e.source)?.shortName ?? e.source;
-    const b = nodeById.get(e.target)?.shortName ?? e.target;
+    const a = resolveNode(e.source)?.shortName ?? e.source;
+    const b = resolveNode(e.target)?.shortName ?? e.target;
     tip = {
       x: Math.min(rect.width - 300, Math.max(12, ev.clientX - rect.left + 14)),
       y: Math.min(rect.height - 130, Math.max(12, ev.clientY - rect.top + 14)),

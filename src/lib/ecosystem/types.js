@@ -1,5 +1,5 @@
 /**
- * @typedef {'intelligence'|'screener'|'portfolio'|'portal'|'ops'|'vendor'|'infra'} DomainId
+ * @typedef {'intelligence'|'screener'|'portfolio'|'portal'|'ops'|'vendor'|'infra'|'pipe-dd'|'pipe-dcf'|'pipe-screening'|'pipe-portfolio'|'pipe-ep'|'pipe-earnings'} DomainId
  *
  * @typedef {'project'|'application'|'service'|'database'|'infrastructure'|'external'|'satellite'} NodeKind
  *

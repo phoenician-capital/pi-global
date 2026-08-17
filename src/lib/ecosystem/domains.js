@@ -58,6 +58,57 @@ export const domains = {
     color: "#3a4a5a",
     accent: "#4f6575",
   },
+  // ── Pipelines view — one synthetic domain per pipeline, used only to color
+  // and hull-group that pipeline's own stage graph. Namespaced (`pipe-*`) so
+  // these can never collide with a real ecosystem domain id above.
+  "pipe-dd": {
+    id: "pipe-dd",
+    name: "DD Pipeline",
+    shortLabel: "DD",
+    blurb: "Due-diligence report generation, stage by stage.",
+    color: "#f0b429",
+    accent: "#f0b429",
+  },
+  "pipe-dcf": {
+    id: "pipe-dcf",
+    name: "DCF Pipeline",
+    shortLabel: "DCF",
+    blurb: "The valuation engine embedded inside the DD report.",
+    color: "#ff9a52",
+    accent: "#ff9a52",
+  },
+  "pipe-screening": {
+    id: "pipe-screening",
+    name: "Screening Pipeline",
+    shortLabel: "Screening",
+    blurb: "Chat, memory, playbooks, and the skills that vote Pass/Watch.",
+    color: "#2dd4bf",
+    accent: "#2dd4bf",
+  },
+  "pipe-portfolio": {
+    id: "pipe-portfolio",
+    name: "Portfolio Pipeline",
+    shortLabel: "Portfolio",
+    blurb: "Research intake through to a published, live-tracked book.",
+    color: "#4fa8ff",
+    accent: "#4fa8ff",
+  },
+  "pipe-ep": {
+    id: "pipe-ep",
+    name: "EP (Earnings Preview)",
+    shortLabel: "EP",
+    blurb: "Earnings-surprise preview, walled off from portfolio weights.",
+    color: "#b18cff",
+    accent: "#b18cff",
+  },
+  "pipe-earnings": {
+    id: "pipe-earnings",
+    name: "Earnings Pipeline",
+    shortLabel: "Earnings",
+    blurb: "Scrape, discover, summarize, and surface earnings events.",
+    color: "#ff6f91",
+    accent: "#ff6f91",
+  },
 };
 
 /**

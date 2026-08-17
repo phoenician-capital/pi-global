@@ -1,4 +1,5 @@
 <script>
+  import GalaxyMap from "./GalaxyMap.svelte";
   import { pipelines, pipelineById } from "$lib/ecosystem/pipelines.js";
 
   /**
@@ -22,15 +23,15 @@
     return [...map.entries()];
   });
 
-  /** Signature accent color per pipeline — its "circuit color" throughout the view.
-   * @type {Record<string, { c: string, glow: string }>} */
+  /** Signature accent color per pipeline (mirrors the `pipe-*` domains in ecosystem/domains.js).
+   * @type {Record<string, string>} */
   const ACCENTS = {
-    dd: { c: "#f0b429", glow: "rgba(240, 180, 41, 0.5)" },
-    dcf: { c: "#ff9a52", glow: "rgba(255, 154, 82, 0.5)" },
-    screening: { c: "#2dd4bf", glow: "rgba(45, 212, 191, 0.5)" },
-    portfolio: { c: "#4fa8ff", glow: "rgba(79, 168, 255, 0.5)" },
-    ep: { c: "#b18cff", glow: "rgba(177, 140, 255, 0.5)" },
-    earnings: { c: "#ff6f91", glow: "rgba(255, 111, 145, 0.5)" },
+    dd: "#c9971f",
+    dcf: "#d97a2e",
+    screening: "#1f9d90",
+    portfolio: "#2f7fd6",
+    ep: "#8a6bd6",
+    earnings: "#d6497a",
   };
   const accent = $derived(ACCENTS[activeId ?? ""] ?? ACCENTS.dd);
 
@@ -38,18 +39,85 @@
    * @type {Record<string, { label: string, color: string, glyph: string }>} */
   const PROVIDERS = {
     claude: { label: "Claude", color: "#d97757", glyph: "C" },
-    openai: { label: "OpenAI", color: "#12a37f", glyph: "O" },
-    gemini: { label: "Gemini", color: "#4285f4", glyph: "G" },
-    deepseek: { label: "DeepSeek", color: "#4d6bfe", glyph: "D" },
-    perplexity: { label: "Perplexity", color: "#20808d", glyph: "P" },
-    ai: { label: "AI (unconfirmed model)", color: "#9a8cff", glyph: "AI" },
-    mixed: { label: "Mixed / multiple", color: "#c9a227", glyph: "×" },
-    none: { label: "Code — no AI", color: "#5b6472", glyph: "</>" },
+    openai: { label: "OpenAI", color: "#0e8f70", glyph: "O" },
+    gemini: { label: "Gemini", color: "#3d72c9", glyph: "G" },
+    deepseek: { label: "DeepSeek", color: "#4d5fc9", glyph: "D" },
+    perplexity: { label: "Perplexity", color: "#1f7a85", glyph: "P" },
+    ai: { label: "AI (unconfirmed model)", color: "#8a6bd6", glyph: "AI" },
+    mixed: { label: "Mixed / multiple", color: "#b8862e", glyph: "×" },
+    none: { label: "Code — no AI", color: "#6b7280", glyph: "</>" },
   };
 
   /** @param {string} provider */
   function providerMeta(provider) {
     return PROVIDERS[provider] ?? PROVIDERS.ai;
+  }
+
+  const ROW_SIZE = 4;
+  const DX = 250;
+  const DY = 185;
+
+  /** Lay each pipeline's stages out as a serpentine node graph and hand it to GalaxyMap.
+   * @type {{ nodes: import('$lib/ecosystem/types.js').EcoNode[], edges: import('$lib/ecosystem/types.js').EcoEdge[] }} */
+  const graph = $derived.by(() => {
+    if (!active) return { nodes: [], edges: [] };
+    const domain = /** @type {import('$lib/ecosystem/types.js').DomainId} */ (`pipe-${active.id}`);
+    const nodes = active.stages.map((s, i) => {
+      const row = Math.floor(i / ROW_SIZE);
+      const col = i % ROW_SIZE;
+      const leftToRight = row % 2 === 0;
+      const x = 170 + (leftToRight ? col : ROW_SIZE - 1 - col) * DX;
+      const y = 150 + row * DY;
+      return {
+        id: `${active.id}-${i}`,
+        name: s.name,
+        shortName: s.name.length > 24 ? `${s.name.slice(0, 22)}…` : s.name,
+        domain,
+        kind: /** @type {import('$lib/ecosystem/types.js').NodeKind} */ ("application"),
+        purpose: s.description,
+        stack: [],
+        techLayer: /** @type {import('$lib/ecosystem/types.js').TechLayer} */ ("worker"),
+        business: [],
+        tags: [],
+        x,
+        y,
+        r: 30,
+      };
+    });
+    const edges = active.stages.slice(0, -1).map((s, i) => ({
+      id: `${active.id}-e${i}`,
+      source: `${active.id}-${i}`,
+      target: `${active.id}-${i + 1}`,
+      type: /** @type {import('$lib/ecosystem/types.js').EdgeType} */ ("job"),
+      label: active.stages[i + 1].name,
+      description: active.stages[i + 1].triggeredBy ?? "",
+      confidence: /** @type {import('$lib/ecosystem/types.js').Confidence} */ ("confirmed"),
+      evidence: [],
+    }));
+    return { nodes, edges };
+  });
+
+  const allEdgeIds = $derived(new Set(graph.edges.map((e) => e.id)));
+
+  let selectedStageIdx = $state(0);
+  /** @type {GalaxyMap|null} */
+  let mapRef = $state(null);
+
+  const selectedNodeId = $derived(graph.nodes[selectedStageIdx]?.id ?? null);
+  const selectedStage = $derived(active?.stages[selectedStageIdx] ?? null);
+  const selectedPv = $derived(providerMeta(selectedStage?.ai?.provider ?? "ai"));
+
+  $effect(() => {
+    if (!active) return;
+    void active.id; // reactive dependency — re-run when the selected pipeline changes
+    selectedStageIdx = 0;
+    queueMicrotask(() => mapRef?.fitAll());
+  });
+
+  /** @param {string} id */
+  function selectNodeById(id) {
+    const idx = graph.nodes.findIndex((n) => n.id === id);
+    if (idx >= 0) selectedStageIdx = idx;
   }
 
   /** @param {string} id */
@@ -58,18 +126,17 @@
   }
 </script>
 
-<div class="desk" style:--accent={accent.c} style:--accent-glow={accent.glow}>
+<div class="desk">
   <aside class="rail">
     <ul class="plist">
       {#each groups as [groupName, items] (groupName)}
         <li class="section-label">{groupName}</li>
         {#each items as p (p.id)}
-          {@const pa = ACCENTS[p.id] ?? ACCENTS.dd}
           <li>
             <button
               type="button"
               class:active={activeId === p.id}
-              style:--dot={pa.c}
+              style:--dot={ACCENTS[p.id] ?? ACCENTS.dd}
               onclick={() => pick(p.id)}
             >
               <span class="dot" aria-hidden="true"></span>
@@ -84,72 +151,80 @@
     </ul>
   </aside>
 
-  <section class="main">
+  <section class="main" style:--accent={accent}>
     {#if active}
-      {#key active.id}
-        <div class="glow-a" aria-hidden="true"></div>
-        <div class="glow-b" aria-hidden="true"></div>
+      <header class="main-head">
+        <p class="eyebrow">{active.group}</p>
+        <h2>{active.product}</h2>
+        <p class="tagline">{active.oneLiner}</p>
+      </header>
 
-        <header class="main-head">
-          <p class="eyebrow">{active.group}</p>
-          <h2>{active.product}</h2>
-          <p class="tagline">{active.oneLiner}</p>
-        </header>
+      <div class="map-area">
+        <GalaxyMap
+          bind:this={mapRef}
+          nodes={graph.nodes}
+          edges={graph.edges}
+          selectedId={selectedNodeId}
+          selectedEdgeId={null}
+          highlightNodes={new Set()}
+          highlightEdges={allEdgeIds}
+          animateFlow={true}
+          onselectnode={selectNodeById}
+        />
+        <p class="map-hint">Click a stage to read it · drag to pan · scroll to zoom</p>
+      </div>
 
-        <div class="main-body">
-          <ol class="stage-list">
-            {#each active.stages as s, i (s.name)}
-              {@const pv = providerMeta(s.ai?.provider ?? "ai")}
-              <li class="stage" style:animation-delay="{i * 70}ms">
-                <div class="node-col">
-                  <span class="node" style:--pv={pv.color}>
-                    <span class="node-num">{i + 1}</span>
-                    <span class="node-ring"></span>
-                  </span>
-                  {#if i < active.stages.length - 1}
-                    <span class="wire">
-                      <span class="spark s1"></span>
-                      <span class="spark s2"></span>
-                      <span class="spark s3"></span>
-                    </span>
-                  {/if}
-                </div>
-                <div class="stage-card">
-                  <div class="stage-top">
-                    <h3>{s.name}</h3>
-                    <span class="ai-badge" style:--pv={pv.color} title={s.ai?.note ?? pv.label}>
-                      <span class="ai-glyph">{pv.glyph}</span>
-                      {s.ai?.model ?? pv.label}
-                    </span>
-                  </div>
-                  <p class="desc">{s.description}</p>
-                  {#if s.ai?.note}
-                    <p class="ai-note">{s.ai.note}</p>
-                  {/if}
-                  {#if s.triggeredBy}
-                    <p class="trigger"><span>Starts when</span> {s.triggeredBy}</p>
-                  {/if}
-                </div>
-              </li>
-            {/each}
-          </ol>
-
-          {#if active.enhancementIdeas?.length}
-            <div class="enhance">
-              <h3><span class="spark-ico" aria-hidden="true"></span>What could be added or changed</h3>
-              <ul>
-                {#each active.enhancementIdeas as idea}
-                  <li>{idea}</li>
-                {/each}
-              </ul>
+      {#if selectedStage}
+        <div class="detail" style:--pv={selectedPv.color}>
+          <div class="detail-top">
+            <span class="detail-num">{selectedStageIdx + 1}</span>
+            <h3>{selectedStage.name}</h3>
+            <span class="ai-badge" title={selectedStage.ai?.note ?? selectedPv.label}>
+              <span class="ai-glyph">{selectedPv.glyph}</span>
+              {selectedStage.ai?.model ?? selectedPv.label}
+            </span>
+            <div class="detail-nav">
+              <button
+                type="button"
+                disabled={selectedStageIdx === 0}
+                onclick={() => (selectedStageIdx -= 1)}
+                aria-label="Previous stage"
+              >‹</button>
+              <span class="detail-count">{selectedStageIdx + 1} / {active.stages.length}</span>
+              <button
+                type="button"
+                disabled={selectedStageIdx === active.stages.length - 1}
+                onclick={() => (selectedStageIdx += 1)}
+                aria-label="Next stage"
+              >›</button>
             </div>
+          </div>
+          <p class="desc">{selectedStage.description}</p>
+          {#if selectedStage.ai?.note}
+            <p class="ai-note">{selectedStage.ai.note}</p>
           {/if}
-
-          {#if active.sourceNotes}
-            <p class="source-notes">{active.sourceNotes}</p>
+          {#if selectedStage.triggeredBy}
+            <p class="trigger"><span>Starts when</span> {selectedStage.triggeredBy}</p>
           {/if}
         </div>
-      {/key}
+      {/if}
+
+      <div class="main-body">
+        {#if active.enhancementIdeas?.length}
+          <div class="enhance">
+            <h3>What could be added or changed</h3>
+            <ul>
+              {#each active.enhancementIdeas as idea}
+                <li>{idea}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
+        {#if active.sourceNotes}
+          <p class="source-notes">{active.sourceNotes}</p>
+        {/if}
+      </div>
     {:else}
       <div class="empty">Choose a pipeline on the left.</div>
     {/if}
@@ -158,17 +233,15 @@
 
 <style>
   .desk {
-    --accent: #f0b429;
-    --accent-glow: rgba(240, 180, 41, 0.5);
     display: grid;
-    grid-template-columns: minmax(230px, 300px) 1fr;
+    grid-template-columns: minmax(220px, 280px) 1fr;
     height: 100%;
     min-height: 0;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    background: var(--panel);
     overflow: hidden;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-    background: #0a0d14;
+    box-shadow: var(--shadow);
   }
 
   /* ── Rail ─────────────────────────────────────────────────────────── */
@@ -177,9 +250,9 @@
     flex-direction: column;
     min-height: 0;
     overflow-y: auto;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    background: #0c1019;
-    padding: 10px;
+    border-right: 1px solid var(--line);
+    background: rgba(40, 32, 20, 0.04);
+    padding: 8px;
   }
 
   .plist {
@@ -195,10 +268,10 @@
     font-family: var(--font-ui);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.35);
-    padding: 14px 10px 5px;
+    color: var(--fg-mute);
+    padding: 12px 10px 4px;
   }
 
   .plist button {
@@ -206,28 +279,26 @@
     text-align: left;
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 10px 10px;
-    border-radius: 10px;
+    gap: 9px;
+    padding: 9px 10px;
+    border-radius: 9px;
     background: transparent;
-    transition: background 0.15s ease;
   }
 
   .plist button:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(138, 106, 47, 0.08);
   }
 
   .plist button.active {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    background: rgba(138, 106, 47, 0.12);
     box-shadow: inset 2px 0 0 var(--dot);
   }
 
   .dot {
-    width: 9px;
-    height: 9px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--dot);
-    box-shadow: 0 0 10px var(--dot);
     margin-top: 5px;
     flex-shrink: 0;
   }
@@ -243,13 +314,13 @@
     font-family: var(--font-ui);
     font-weight: 650;
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.92);
+    color: var(--fg);
   }
 
   .one {
     font-size: 11px;
     line-height: 1.4;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--fg-mute);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -259,263 +330,127 @@
 
   /* ── Main ─────────────────────────────────────────────────────────── */
   .main {
-    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow-y: auto;
-    overflow-x: hidden;
-    background:
-      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(255, 255, 255, 0.05), transparent 60%),
-      #0a0d14;
-  }
-
-  .glow-a,
-  .glow-b {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(90px);
-    pointer-events: none;
-    opacity: 0.35;
-    z-index: 0;
-    animation: drift 14s ease-in-out infinite alternate;
-  }
-  .glow-a {
-    width: 420px;
-    height: 420px;
-    top: -120px;
-    right: -100px;
-    background: var(--accent-glow);
-  }
-  .glow-b {
-    width: 320px;
-    height: 320px;
-    bottom: 10%;
-    left: -80px;
-    background: var(--accent-glow);
-    animation-delay: -6s;
-  }
-
-  @keyframes drift {
-    from {
-      transform: translate(0, 0) scale(1);
-    }
-    to {
-      transform: translate(30px, -20px) scale(1.08);
-    }
   }
 
   .main-head {
-    position: relative;
-    z-index: 1;
-    padding: 26px 32px 18px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(6px);
+    padding: 20px 26px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    position: sticky;
+    top: 0;
+    z-index: 2;
   }
 
   .eyebrow {
     font-family: var(--font-ui);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--accent);
-    text-shadow: 0 0 12px var(--accent-glow);
-    margin: 0 0 8px;
+    margin: 0 0 6px;
   }
 
   .main-head h2 {
     font-family: var(--font-display);
-    font-size: 28px;
-    margin: 0 0 8px;
-    color: #fdfbf7;
+    font-size: 24px;
+    margin: 0 0 6px;
+    color: var(--fg);
   }
 
   .tagline {
     margin: 0;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 14px;
-    line-height: 1.55;
-    max-width: 70ch;
+    color: var(--fg-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+    max-width: 72ch;
   }
 
-  .main-body {
+  /* ── Map ──────────────────────────────────────────────────────────── */
+  .map-area {
     position: relative;
-    z-index: 1;
-    padding: 30px 32px 40px;
+    flex: 0 0 auto;
+    height: 46vh;
+    min-height: 360px;
+    max-height: 520px;
+    border-bottom: 1px solid var(--line);
   }
 
-  /* ── Stage timeline ───────────────────────────────────────────────── */
-  .stage-list {
-    list-style: none;
+  .map-hint {
+    position: absolute;
+    left: 14px;
+    bottom: 10px;
     margin: 0;
-    padding: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 252, 247, 0.85);
+    border: 1px solid var(--panel-border);
+    font-family: var(--font-ui);
+    font-size: 10.5px;
+    color: var(--fg-mute);
+    pointer-events: none;
+  }
+
+  /* ── Detail panel for the selected stage ─────────────────────────── */
+  .detail {
+    --pv: #8a6bd6;
+    margin: 18px 26px 0;
+    padding: 16px 20px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--pv) 6%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--pv) 30%, var(--panel-border));
+  }
+
+  .detail-top {
     display: flex;
-    flex-direction: column;
-  }
-
-  .stage {
-    display: grid;
-    grid-template-columns: 40px 1fr;
-    gap: 16px;
-    animation: rise-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  @keyframes rise-in {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .node-col {
-    display: flex;
-    flex-direction: column;
     align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
   }
 
-  .node {
-    position: relative;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #1b2130, #0c0f16);
-    border: 1.5px solid var(--pv);
-    display: flex;
+  .detail-num {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    box-shadow: 0 0 14px 1px color-mix(in srgb, var(--pv) 55%, transparent);
-  }
-
-  .node-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--pv);
+    color: #fffcf7;
     font-family: var(--font-ui);
     font-weight: 700;
     font-size: 12px;
-    color: #fdfbf7;
+    flex-shrink: 0;
   }
 
-  .node-ring {
-    position: absolute;
-    inset: -5px;
-    border-radius: 50%;
-    border: 1px solid color-mix(in srgb, var(--pv) 60%, transparent);
-    animation: pulse-ring 2.6s ease-out infinite;
-  }
-
-  @keyframes pulse-ring {
-    0% {
-      transform: scale(0.85);
-      opacity: 0.7;
-    }
-    75% {
-      transform: scale(1.5);
-      opacity: 0;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-
-  .wire {
-    position: relative;
-    width: 2px;
-    flex: 1;
-    min-height: 46px;
-    margin: 2px 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
-  }
-
-  .spark {
-    position: absolute;
-    left: 50%;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 8px 2px var(--accent-glow);
-    transform: translateX(-50%);
-    animation: flow-down 2.4s linear infinite;
-    opacity: 0;
-  }
-  .spark.s1 {
-    animation-delay: 0s;
-  }
-  .spark.s2 {
-    animation-delay: 0.8s;
-  }
-  .spark.s3 {
-    animation-delay: 1.6s;
-  }
-
-  @keyframes flow-down {
-    0% {
-      top: -4%;
-      opacity: 0;
-    }
-    12% {
-      opacity: 1;
-    }
-    85% {
-      opacity: 1;
-    }
-    100% {
-      top: 100%;
-      opacity: 0;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .spark,
-    .node-ring,
-    .glow-a,
-    .glow-b,
-    .stage {
-      animation: none !important;
-    }
-  }
-
-  .stage-card {
-    padding-bottom: 30px;
-    min-width: 0;
-  }
-
-  .stage-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
-  }
-
-  .stage-card h3 {
+  .detail-top h3 {
     font-family: var(--font-ui);
     font-size: 15.5px;
     font-weight: 650;
     margin: 0;
-    color: #fdfbf7;
+    color: var(--fg);
+    flex: 1;
+    min-width: 160px;
   }
 
   .ai-badge {
-    --pv: #9a8cff;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 3px 10px 3px 6px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--pv) 16%, transparent);
+    background: color-mix(in srgb, var(--pv) 14%, transparent);
     border: 1px solid color-mix(in srgb, var(--pv) 45%, transparent);
     font-family: var(--font-ui);
     font-size: 10.5px;
     font-weight: 650;
-    color: color-mix(in srgb, var(--pv) 88%, white);
+    color: color-mix(in srgb, var(--pv) 75%, black);
     white-space: nowrap;
-    flex-shrink: 0;
   }
 
   .ai-glyph {
@@ -526,16 +461,52 @@
     height: 15px;
     border-radius: 50%;
     background: var(--pv);
-    color: #0a0d14;
+    color: #fffcf7;
     font-size: 9px;
     font-weight: 800;
+  }
+
+  .detail-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .detail-nav button {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--fg-dim);
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .detail-nav button:not(:disabled):hover {
+    background: rgba(138, 106, 47, 0.1);
+  }
+
+  .detail-nav button:disabled {
+    opacity: 0.35;
+  }
+
+  .detail-count {
+    font-family: var(--font-ui);
+    font-size: 10.5px;
+    color: var(--fg-mute);
+    min-width: 40px;
+    text-align: center;
   }
 
   .desc {
     margin: 0 0 6px;
     font-size: 13.5px;
     line-height: 1.6;
-    color: rgba(255, 255, 255, 0.68);
+    color: var(--fg-dim);
     max-width: 76ch;
   }
 
@@ -543,7 +514,7 @@
     margin: 0 0 6px;
     font-size: 12px;
     line-height: 1.5;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--fg-mute);
     font-style: italic;
     max-width: 76ch;
   }
@@ -551,7 +522,7 @@
   .trigger {
     margin: 0;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--fg-mute);
   }
 
   .trigger span {
@@ -559,39 +530,29 @@
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.06em;
-    color: var(--accent);
+    color: var(--pv);
     margin-right: 6px;
   }
 
-  /* ── Enhancement ideas ────────────────────────────────────────────── */
+  /* ── Body: enhancement ideas + source notes ──────────────────────── */
+  .main-body {
+    padding: 20px 26px 34px;
+  }
+
   .enhance {
-    margin-top: 6px;
-    padding: 20px 22px;
-    border-radius: 14px;
-    background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 10%, transparent), rgba(255, 255, 255, 0.02));
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    box-shadow: 0 0 30px -10px var(--accent-glow);
+    padding: 18px 20px;
+    border-radius: 12px;
+    background: rgba(138, 106, 47, 0.06);
+    border: 1px solid rgba(138, 106, 47, 0.18);
   }
 
   .enhance h3 {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     font-family: var(--font-ui);
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.02em;
-    margin: 0 0 12px;
-    color: var(--accent);
-  }
-
-  .spark-ico {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 10px 2px var(--accent-glow);
-    animation: pulse-ring 2.2s ease-out infinite;
+    margin: 0 0 10px;
+    color: var(--gold-soft);
   }
 
   .enhance ul {
@@ -599,20 +560,20 @@
     padding: 0 0 0 18px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 9px;
   }
 
   .enhance li {
     font-size: 13px;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.72);
+    line-height: 1.55;
+    color: var(--fg-dim);
   }
 
   .source-notes {
-    margin: 22px 2px 0;
+    margin: 18px 2px 0;
     font-size: 11.5px;
     line-height: 1.6;
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--fg-mute);
     max-width: 80ch;
   }
 
@@ -621,7 +582,7 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--fg-mute);
     font-size: 14px;
   }
 </style>
