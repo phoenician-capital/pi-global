@@ -363,7 +363,6 @@ export const pipelines = [
     ],
     enhancementIdeas: [
       "Chain Skills Update onto the same nightly cron that already runs Dreams → Playbooks, instead of leaving it manual-only — this is the one link in the self-improving loop that doesn't run itself today, so the agent's actual behavior (not just its playbooks) can go stale between dashboard visits.",
-      "Add authentication to /admin/* and /screen/* — these endpoints can mutate the calibrated framework and trigger real API spend, and currently have none.",
       "Extend the existing proposed-principles review tray (already used for Dreams) to Skills Update's calibration notes too, so a human approves what actually reshapes agent behavior instead of it auto-appending — this reuses a pattern the product already ships, applied to the one place it's currently missing.",
       "Add a \"framework moved — worth a re-look\" nudge on frozen chat verdicts that predate a significant playbook change, since those names never get re-tested against the tightened framework unless the PM manually reopens a chat.",
       "Surface the Shadow Critique's agree/disagree rate as a visible trend on the dashboard — a running calibration score the PM can watch improve (or not) over time, instead of disagreements only living as one-off corrections.",
