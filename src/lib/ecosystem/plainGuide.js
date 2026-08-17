@@ -110,7 +110,7 @@ export const plainGuides = {
   "pi-py": {
     title: "DD engine",
     oneLiner: "Builds deep company research reports — gathers data, writes sections with AI, runs valuation math.",
-    doesThis: "This is where the long diligence write-ups are actually generated. Finished reports land on the shared PI disk (EFS).",
+    doesThis: "This is where the long diligence write-ups are actually generated. Finished reports land in the shared report folder.",
     doesNot: "It is not the login screen and not the investor portal. PI control starts the job; the DD engine does the heavy writing.",
     whoFor: "Investment team using Phoenician Intelligence for due diligence.",
     aiStory: "Uses many AI providers (Claude, OpenAI, Gemini, DeepSeek, and others) plus document search. Writing rules live as prompt templates.",
@@ -125,9 +125,9 @@ export const plainGuides = {
     title: "PI control",
     oneLiner: "The front desk for Phoenician Intelligence — login, start/cancel jobs, live status, notes, billing.",
     doesThis:
-      "Coordinates people and jobs. It asks the DD engine to write reports; reads the shared PI disk (EFS); and can send DD / risk / DCF data to Portfolio over a secure API.",
+      "Coordinates people and jobs. It asks the DD engine to write reports; reads the shared report folder; and can send DD / risk / DCF data to Portfolio.",
     doesNot:
-      "Does not write the report sections itself. Portfolio does not share this login and does not mount EFS — it only calls this API.",
+      "Does not write the report sections itself. Portfolio has its own separate login and doesn't reach into the shared report folder directly — it just asks PI control for the data it needs.",
     whoFor: "Same research users (via the website) plus ops watching costs and status.",
     aiStory: "Almost no research AI here. OpenAI is used for text-to-speech. Claude is used only for developer log analysis.",
     readOrder: [
@@ -137,14 +137,14 @@ export const plainGuides = {
     ],
   },
   "efs-pi": {
-    title: "PI EFS",
-    oneLiner: "The shared file drive where DD reports and CapIQ dumps live for Phoenician Intelligence.",
+    title: "Shared Report Files",
+    oneLiner: "The shared file drive where DD reports and CapIQ downloads live for Phoenician Intelligence.",
     doesThis: "Stores company folders, progress markers, and raw downloads so PI control and the DD engine see the same files.",
     doesNot:
-      "Not a database. Not mounted by Portfolio — Portfolio receives DD data through the PI control API instead.",
+      "Not a database — just a shared folder. Portfolio can't open it directly; it receives DD data by asking PI control instead.",
     whoFor: "PI backends only (PI control + DD engine).",
     aiStory: "No AI on the disk itself — it stores the outputs of the DD engine.",
-    readOrder: ["What this does → who mounts it → how Portfolio still gets DD (via PI API)."],
+    readOrder: ["What this does → who can open it → how Portfolio still gets DD data (by asking PI control)."],
   },
   "pi-fe": {
     title: "PI website",
@@ -159,13 +159,13 @@ export const plainGuides = {
     title: "Portfolio API",
     oneLiner: "Builds and maintains investment “books” — research stages, scores, live tips.",
     doesThis:
-      "Runs the Portfolio strategy pipeline and serves results to the PM website. Pulls DD / risk / DCF from PI control over a secure API.",
+      "Runs the Portfolio strategy pipeline and serves results to the PM website. Requests DD / risk / DCF data from PI control when it needs it.",
     doesNot:
-      "Does not mount PI’s shared EFS disk. Not Earnings Tracker (calendar scrape). Not the marketing factsheet site.",
+      "Doesn’t have direct access to PI’s shared report files — it only asks PI control for what it needs. Not Earnings Tracker (calendar scrape). Not the marketing factsheet site.",
     whoFor: "Portfolio management team.",
     aiStory:
       "Claude models by stage. Optional DeepSeek for universe-run. Strict rule: some research (earnings, debate, lessons…) must not change portfolio weights.",
-    readOrder: ["What this does → link to PI (HTTP, not EFS) → AI instructions (especially NEVER→weights)."],
+    readOrder: ["What this does → how it asks PI for data → AI instructions (especially: some research must never move portfolio weights)."],
   },
   "pm-fe": {
     title: "PM website",
@@ -190,7 +190,7 @@ export const plainGuides = {
     title: "Portal API",
     oneLiner: "Secure home for investors & admins: login, documents, KYC, e-sign, IR mail, market quotes.",
     doesThis: "Stores investor data and runs admin tools. Emails via Resend; live e-sign via DocuSeal.",
-    doesNot: "Not Phoenician Intelligence login (different JWT). DocuSign code exists but is not wired live.",
+    doesNot: "Not the Phoenician Intelligence login — investors and PI users sign in separately. DocuSign code exists but is not wired live.",
     whoFor: "Investors (app/web) and internal admins.",
     aiStory: "AI is admin-only: OpenAI helps rename/split/extract fields from uploaded PDFs — not for portfolio investment decisions.",
     readOrder: ["What this does → AI story → email/e-sign rows → conversation table."],

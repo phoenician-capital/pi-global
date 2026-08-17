@@ -32,7 +32,7 @@
 
   /** @typedef {import('$lib/ecosystem/index.js').ViewId} ViewId */
 
-  let view = $state(/** @type {ViewId} */ ("architecture"));
+  let view = $state(/** @type {ViewId} */ ("intelligence"));
   let selectedId = $state(/** @type {string|null} */ (null));
   let selectedEdgeId = $state(/** @type {string|null} */ (null));
   let journeyId = $state(journeys[0]?.id ?? "");
