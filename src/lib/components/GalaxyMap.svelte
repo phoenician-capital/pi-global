@@ -96,13 +96,13 @@
   function nodeOpacity(n) {
     if (focusedDomain && n.domain !== focusedDomain && n.domain !== "vendor" && n.domain !== "infra") {
       // keep vendors/infra visible if connected later; soft-hide other domains
-      if (!highlightNodes.has(n.id) && selectedId !== n.id) return 0.12;
+      if (!highlightNodes.has(n.id) && selectedId !== n.id) return 0.24;
     }
     if (hoveredNode === n.id) return 1;
     if (!dimUnrelated && !hasHighlight) return 1;
     if (selectedId === n.id) return 1;
     if (highlightNodes.has(n.id)) return 1;
-    if (dimUnrelated || hasHighlight) return softDim ? 0.32 : 0.12;
+    if (dimUnrelated || hasHighlight) return softDim ? 0.45 : 0.24;
     return 1;
   }
 
@@ -112,7 +112,7 @@
     if (selectedEdgeId === e.id) return 1;
     if (highlightEdges.has(e.id)) return 0.95;
     if (selectedId && (e.source === selectedId || e.target === selectedId)) return 0.85;
-    if (dimUnrelated || hasHighlight) return softDim ? 0.22 : 0.1;
+    if (dimUnrelated || hasHighlight) return softDim ? 0.35 : 0.2;
     return band === "far" ? 0.4 : 0.7;
   }
 
@@ -554,10 +554,10 @@
             height={h.maxY - h.minY + h.pad * 2}
             rx="36"
             fill={h.meta?.color ?? "#5a5044"}
-            fill-opacity={band === "far" ? 0.16 : 0.1}
+            fill-opacity={band === "far" ? 0.24 : 0.17}
             stroke={h.meta?.accent ?? "#6f685c"}
-            stroke-opacity={focusedDomain === h.id ? 0.85 : 0.45}
-            stroke-width={focusedDomain === h.id ? 2.2 : 1.2}
+            stroke-opacity={focusedDomain === h.id ? 0.85 : 0.62}
+            stroke-width={focusedDomain === h.id ? 2.2 : 1.4}
           />
           <text
             class="hull-label"
