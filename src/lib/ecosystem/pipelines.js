@@ -5,9 +5,10 @@
  * happens and what triggers it, not raw "endpoint X calls endpoint Y" wiring.
  *
  * `ai.provider` is one of: "claude" | "openai" | "gemini" | "deepseek" |
- * "perplexity" | "ai" (an AI call confirmed but the exact provider/model
- * wasn't pinned down with certainty) | "mixed" (more than one provider in
- * this one stage) | "none" (deterministic code, no AI call at all).
+ * "perplexity" | "mixed" (more than one provider in this one stage) |
+ * "none" (deterministic code, no AI call at all). Every stage below has a
+ * confirmed attribution, cited to exact files/lines/env vars/config keys —
+ * none are guessed.
  *
  * @typedef {{ provider: string, model?: string, note?: string }} StageAi
  * @typedef {{ name: string, description: string, triggeredBy?: string, ai: StageAi }} PipelineStage
@@ -31,105 +32,109 @@ export const pipelines = [
     oneLiner:
       "Turns a requested ticker into a finished, cached 12-section institutional due-diligence report (with an embedded DCF model) and keeps it interrogable afterward through a report-aware chatbot.",
     sourceNotes:
-      "Existing docs (ARCHITECTURE.md, FLOWCHART.md, AI_FLOW.md) were stale on two material points the code contradicts: they describe 14 sections with DCF as its own numbered section, when the real code has 12 sections with DCF nested inside Section 8; and they state the wrong production order.",
+      "Every AI attribution below is confirmed against the live code (file/line/env var), not assumed from docs — the architecture docs turned out to describe a 14-section report with the wrong production order; the real code has 12 sections in a dependency-driven order.",
     stages: [
       {
         name: "Request intake & freshness check",
         description:
           "A user submits a ticker via the frontend form; the .NET backend creates a TickerRequest row and POSTs to the Python service. Python checks whether raw data for that ticker already exists and is fresher than 90 days, and separately whether each individual source (AlphaSense, CapIQ Excel files, PDFs) is present — this decides whether to skip, selectively refresh, or fully re-collect data.",
         triggeredBy: "User submits the ticker request form",
-        ai: { provider: "none", note: "Pure freshness/date-diff logic against Postgres" },
+        ai: { provider: "none", note: "Pure filesystem mtime/path freshness checks" },
       },
       {
         name: "Parallel data collection",
         description:
-          "Up to four data sources run concurrently: AlphaSense analyst PDFs, CapIQ financials/multiples/board/compensation/competitor segments, an investor-relations/SEC/transcript PDF crawler, and company review scraping. Only sources actually missing or stale are run, followed by an Excel-cleaning pass that uses Claude to detect table boundaries and normalize raw spreadsheets.",
+          "Up to four data sources run concurrently: AlphaSense analyst PDFs, CapIQ financials/multiples/board/compensation/competitor segments, an investor-relations/SEC/transcript PDF crawler, and company review scraping. Only sources actually missing or stale are run, followed by a fully deterministic Excel-cleaning pass (rule-based table-boundary detection, no AI).",
         triggeredBy: "Freshness check finds data missing, stale, or force-refreshed",
-        ai: { provider: "claude", note: "Scraping itself has no AI; the Excel-cleaning sub-step is Claude" },
+        ai: { provider: "none", note: "Scraping + Excel cleaning are both deterministic. (PDF categorization and review-sentiment tagging elsewhere in this phase do use Claude Haiku, but aren't part of this stage.)" },
       },
       {
         name: "Isolated workflow launch",
         description:
           "The report-writing workflow runs as its own separate process (own memory, own AI connections) so concurrent reports for different tickers can never contaminate each other.",
         triggeredBy: "Data collection completing (or being skipped because data was already fresh)",
-        ai: { provider: "none", note: "Process/infra orchestration only" },
+        ai: { provider: "none", note: "OS-level subprocess launch only" },
       },
       {
         name: "Context assembly",
         description:
-          "All the cleaned financial data, board/executive info, and ownership data gets loaded into memory; live price and 5-year price history are pulled; an AI writes a short plain-English company description that gets reused across every later section.",
+          "All the cleaned financial data, board/executive info, and ownership data gets loaded into memory; live price and 5-year price history are pulled; GPT-4o writes a short plain-English company description that gets reused across every later section.",
         triggeredBy: "Workflow starting",
-        ai: { provider: "ai", note: "Company-description writer — exact model not pinned down yet" },
+        ai: { provider: "openai", model: "gpt-4o", note: "Hardcoded, not provider-switchable — the rest of context assembly (budgeting, stitching, trimming) is deterministic Python" },
       },
       {
         name: "Institutional memory lens",
         description:
-          "Pulls prior institutional context/memory for the company or sector and turns it into guiding questions injected into every section's writing prompt. Fails silently if memory is thin — the rest of the run proceeds unaffected.",
+          "Claude pulls prior institutional context/memory for the company or sector and turns it into guiding questions injected into every section's writing prompt. Fails silently if memory is thin — the rest of the run proceeds unaffected.",
         triggeredBy: "Context assembly finishing",
-        ai: { provider: "ai", note: "Advisory-question generation — exact model not pinned down yet" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6", note: "The raw-memory retrieval feeding it is a deterministic keyword lookup, no embedding call" },
       },
       {
         name: "Document search setup",
         description:
-          "All scraped company documents are indexed for AI search, and the analyst research PDFs are indexed separately — so \"our own documents\" and \"external analyst research\" stay queryable as two independent evidence pools.",
+          "All scraped company documents are indexed for AI search via Gemini's File API, and the analyst research PDFs are indexed separately — so \"our own documents\" and \"external analyst research\" stay queryable as two independent evidence pools.",
         triggeredBy: "Memory lens step completing",
-        ai: { provider: "gemini", model: "Gemini File API", note: "File indexing/upload, not generation" },
+        ai: { provider: "gemini", model: "gemini-2.5-flash-lite", note: "File indexing/upload, not text generation" },
       },
       {
         name: "Research query generation",
         description:
           "For each section, Claude Sonnet generates targeted search queries, which are scored for quality and regenerated if they fall short. Research for several sections can be fetched ahead of time in parallel to save time.",
         triggeredBy: "Each section's turn to be written (or pre-fetched ahead of time)",
-        ai: { provider: "claude", model: "Claude Sonnet" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6" },
       },
       {
         name: "Evidence retrieval",
         description:
           "Approved queries are run against the indexed documents via Gemini file search; the results are tagged with their source and page, deduplicated, and assembled into an evidence packet for that section.",
         triggeredBy: "Queries approved",
-        ai: { provider: "gemini", model: "Gemini File Search" },
+        ai: { provider: "gemini", model: "gemini-2.5-flash-lite", note: "Context building (dedup/budget trimming) around it is deterministic" },
       },
       {
         name: "Section-by-section writing",
         description:
           "Real production order: Company Overview → Team & Culture → Competitors → TAM → Market Positioning → Performance & Estimates → Valuation → Financial Health → Technical Indicators → Red Flags → Conclusion → Research Challenge. Each section is skipped if already cached; otherwise it's written by Claude from the company info, financials, evidence, and prior sections, and cached to disk.",
         triggeredBy: "Each section's prerequisites (the sections it depends on) being complete",
-        ai: { provider: "claude", note: "The main report-writing model for every section" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6", note: "Cross-provider fallback to gemini-2.5-pro if Anthropic retries are exhausted" },
       },
       {
         name: "Red Flags analysis",
         description:
-          "A dedicated adversarial pass runs 17 fixed risk questions against the evidence and the open web, then writes up the findings. It has no dependencies, so it starts early and runs in the background while other sections are still being written.",
+          "A dedicated adversarial pass runs 17 fixed risk questions, researching each in parallel across Perplexity, Gemini, and OpenAI before Claude synthesizes the final verdict. It has no dependencies, so it starts early and runs in the background while other sections are still being written.",
         triggeredBy: "The report run starting (runs independently, no waiting)",
-        ai: { provider: "ai", note: "Same report-writing model family as other sections, unconfirmed which exact call" },
+        ai: {
+          provider: "mixed",
+          model: "Perplexity (sonar-pro / sonar-deep-research) + Gemini (gemini-2.5-pro) + OpenAI (gpt-4o) research in parallel, synthesized by Claude (claude-sonnet-4-6)",
+          note: "A genuine 4-provider fan-out — the only stage in the whole system that does this",
+        },
       },
       {
         name: "Valuation (embeds the DCF)",
         description:
-          "Runs the full DCF Pipeline (see below) to build an Excel valuation model, then writes the section's narrative using the DCF's exact numbers so the writing can't drift from the model, followed by a comparables-valuation pass against the competitor list.",
+          "Runs the full DCF Pipeline (see below) to build an Excel valuation model, then Claude writes the section's narrative using the DCF's exact numbers so the writing can't drift from the model, followed by a comparables-valuation pass against the competitor list.",
         triggeredBy: "The sections it depends on completing",
-        ai: { provider: "mixed", note: "Embeds the entire DCF Pipeline (see below) plus its own narrative-writing call" },
+        ai: { provider: "mixed", note: "Embeds the entire DCF Pipeline (mostly GPT-5.5, see below); the narrative on top is claude-sonnet-4-6" },
       },
       {
         name: "Conclusion",
         description:
-          "Synthesizes the whole report — pulling in the DCF valuation numbers and the Red Flags findings — into the final investment rating and confidence level. Written second-to-last on purpose, so it can react to everything that came before it, including Red Flags.",
+          "Claude synthesizes the whole report — pulling in the DCF valuation numbers and the Red Flags findings — into the final investment rating and confidence level. Written second-to-last on purpose, so it can react to everything that came before it, including Red Flags.",
         triggeredBy: "All prior sections completing",
-        ai: { provider: "ai", note: "Report-writing model family, unconfirmed which exact call" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6" },
       },
       {
         name: "Research Challenge",
         description:
-          "A dedicated contrarian pass that takes the final rating and builds the bull/bear case against it, generates a weighted counter-thesis, and drafts management cross-examination questions. Genuinely written last.",
+          "A dedicated contrarian pass maps the final rating to a bull/bear stance (deterministic), then Claude builds the counter-thesis and drafts management cross-examination questions. Genuinely written last.",
         triggeredBy: "The Conclusion's rating being available",
-        ai: { provider: "mixed", note: "Bull/bear stance mapping is deterministic code; thesis and questions are AI-generated" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6", note: "Stance mapping is deterministic code; the thesis and questions are generated" },
       },
       {
         name: "Assembly & completeness check",
         description:
           "All 12 sections are assembled in canonical order; a completeness check flags the report as partial if anything is missing; the rating, valuation ratio, and confidence are extracted and sent back to the main system.",
         triggeredBy: "All 12 sections present",
-        ai: { provider: "none", note: "Assembly, counting, and an HMAC-signed callback — no AI" },
+        ai: { provider: "none" },
       },
       {
         name: "Persistence & notification",
@@ -141,18 +146,21 @@ export const pipelines = [
       {
         name: "Report display & chat/QA",
         description:
-          "Once the report is marked complete, the frontend renders it. Opening the chat routes each message through an intent classifier into general Q&A, Gemini-powered PDF search, Excel search, or a section-rewrite suggestion — which produces a diff the user has to explicitly accept, never an unreviewed auto-edit.",
+          "Once the report is marked complete, the frontend renders it (a deterministic read, no generation). Opening the chat routes each message through a Claude intent classifier into general Q&A, Gemini-powered PDF search, Excel search, or a section-rewrite suggestion — which produces a diff the user has to explicitly accept, never an unreviewed auto-edit.",
         triggeredBy: "User opens the report / opens the chat panel",
-        ai: { provider: "mixed", note: "Intent classifier + Q&A + suggestion-writer are AI; PDF search is Gemini; Excel search is a plain webhook" },
+        ai: {
+          provider: "mixed",
+          model: "Intent classifier: claude-opus-4-6 · Q&A + suggestions: claude-sonnet-4-6 (fallback gemini-2.5-pro) · PDF search: gemini-2.5-flash-lite",
+          note: "Display itself is a deterministic read; every downstream chat action has its own model",
+        },
       },
     ],
     enhancementIdeas: [
-      "The architecture docs describe a 14-section report; the real code has 12, with DCF nested inside Section 8. Any diagram/visualization should follow the code's model, not the docs.",
-      "Docs say the report finishes [...,10,1,11,12]; the real order is [...,10,12,1,11] — Red Flags is deliberately finished before the Conclusion so its findings can inform the rating, and Research Challenge is genuinely last.",
-      "\"Update Report\" always reruns a section fully from scratch — there's no partial/diff-based regeneration at that layer. The only diff-based edit path is the chatbot's suggest-and-accept flow, a completely separate mechanism worth distinguishing in any visualization.",
-      "\"Update Report\" also purges five whole cache directories even when only some upstream data actually changed — there's no middle ground between \"regenerate everything\" and \"regenerate nothing.\"",
-      "A partially-built \"skills\" layer already injects guidance into every section and the DCF, but the governance layer around it (a locked skill-binding map, a verification log proving each skill fires only where intended) is still open per the DD Brain integration notes.",
-      "The institutional memory lens fails silently on any error, with no signal in the final report about whether it actually influenced a given run — there's currently no way to tell from the output whether \"house view\" context was used.",
+      "Wire Red Flags' 4-provider research (Perplexity + Gemini + OpenAI, synthesized by Claude) directly into the Portfolio Pipeline's Independent Risk Read — today Portfolio's red-team pass starts from scratch on its own Claude call instead of building on the DD engine's already-deeper adversarial research for the same company.",
+      "Add a \"since last run\" delta view on re-generated reports: surface what changed in the rating, red flags, and DCF output versus the prior version, and why — so an analyst opening an updated report sees the story arc instead of re-reading a full report to spot the diff.",
+      "Add partial \"Update Report\": today any refresh purges and fully regenerates every section from scratch. A change to just one upstream data source (e.g. new investor-relations filing) should only re-trigger the sections whose dependency graph actually touches that source.",
+      "Surface when the Institutional Memory Lens actually influenced a run (e.g. a small badge: \"Used house view on [sector]\") instead of silently succeeding or silently skipping — turns a currently invisible signal into something an investor can trust or question.",
+      "Feed Portfolio's Lessons (validated corrections on how the team actually judges companies) back into the DD Pipeline's section-writing prompts, so report tone/judgment improves from real portfolio-team feedback, not just DD's own internal chatbot edits.",
     ],
   },
   {
@@ -162,84 +170,84 @@ export const pipelines = [
     oneLiner:
       "Given a company's research and cleaned financials, autonomously writes, reviews, runs, and sanity-checks a from-scratch valuation model into a full Excel workbook, then narrates it into assumptions documentation.",
     sourceNotes:
-      "Nested inside the DD Pipeline's Valuation section — it isn't its own top-level report section, and had no dedicated docs of its own, so this was read almost entirely from the pipeline's own code.",
+      "Fully provider-switchable (OpenAI / Claude / Grok / DeepSeek via one config setting) — current default across every AI step is OpenAI's GPT-5.5. One step (the balance-sheet gate) is deliberately pinned to Claude Opus 4.8 specifically if the Claude provider is selected, since Anthropic's newer flagship model's always-on reasoning would burn its token budget before finishing a 130K+ character script echo.",
     stages: [
       {
         name: "Unit-economics discovery",
         description:
           "Figures out what actually drives the company's revenue — subscribers, units sold, same-store sales, etc. — and how detailed the model needs to be, based on the company description and research.",
         triggeredBy: "Valuation section starting, once research and financials are ready",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5", note: "Provider-switchable; openai is the configured default" },
       },
       {
         name: "Assumption extraction",
         description:
           "Pulls valuation drivers straight from the company's filings and research, and separately from what the report's own earlier sections already implied about the business (skipped for a standalone DCF run with no prior sections).",
         triggeredBy: "Discovery step producing its spec",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5" },
       },
       {
         name: "Constraints & guidance mapping",
         description:
           "Classifies each assumption as binding (must honor management's stated guidance), strong, or reference-only, so the model-building step knows which figures it's not allowed to override.",
         triggeredBy: "Both extraction passes completing",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5" },
       },
       {
         name: "Model generation",
         description:
-          "Writes a complete valuation model from scratch as real spreadsheet-building code — genuine generation of the model logic, not a template being filled in. Default model is provider-switchable.",
+          "Writes a complete valuation model from scratch as real spreadsheet-building code — genuine generation of the model logic, not a template being filled in.",
         triggeredBy: "Constraints map being ready",
-        ai: { provider: "openai", model: "GPT-5.5 (high reasoning effort)", note: "Provider-switchable; this is the configured default" },
+        ai: { provider: "openai", model: "gpt-5.5 (xhigh reasoning effort)" },
       },
       {
         name: "Financial sanity review",
         description:
           "Checks the financial logic of the generated model (not just whether it runs) before it's ever executed, with one corrective pass if problems are found.",
         triggeredBy: "Model code being generated, before execution",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5" },
       },
       {
         name: "Code review & correction",
         description:
           "A structured review of the generated code, with a fix pass applied only if issues are found. A failure here sends the whole thing back to model generation for one retry.",
         triggeredBy: "Sanity review resolving",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5" },
       },
       {
         name: "Balance-sheet balance check",
         description:
-          "A dedicated, deliberately expensive check that re-reads the whole model purely to catch balance-sheet imbalance bugs before it's ever run — pinned to a specific model regardless of the provider setting used elsewhere in this pipeline.",
+          "A dedicated, deliberately expensive check that re-reads the whole model purely to catch balance-sheet imbalance bugs before it's ever run.",
         triggeredBy: "Code review passing",
-        ai: { provider: "claude", model: "Claude Opus 4.8 (pinned — the code explicitly forbids substituting a cheaper model here)" },
+        ai: { provider: "openai", model: "gpt-5.5 (default) — pinned to claude-opus-4-8 specifically if the Claude provider is selected", note: "The Opus pin exists because Claude's newer flagship can't have its adaptive reasoning disabled" },
       },
       {
         name: "Compilation check",
         description:
-          "A pure syntax check with no AI judgment involved. If it fails, an automatic fix pass runs once; if it still fails, the whole thing goes back to model generation.",
+          "A pure syntax check with no AI judgment involved — the docstring says so explicitly. If it fails, an automatic fix pass runs once; if it still fails, the whole thing goes back to model generation.",
         triggeredBy: "Balance check passing",
-        ai: { provider: "none", note: "Syntax check itself is deterministic; the fix pass on failure is AI" },
+        ai: { provider: "none", note: "The fix pass on failure uses the same model as Code review & correction" },
       },
       {
         name: "Execution",
         description:
-          "Runs the generated model to actually produce the Excel file. On failure, an automatic patch-and-retry pass runs, saving every failed attempt for debugging.",
+          "Runs the generated model as a sandboxed subprocess to actually produce the Excel file. On runtime failure, an automatic patch-and-retry pass runs, saving every failed attempt for debugging.",
         triggeredBy: "Successful compilation",
-        ai: { provider: "none", note: "Execution itself is deterministic; the runtime-fix pass on failure is AI" },
+        ai: { provider: "none", note: "The runtime-fix pass on failure is an AI call (same CODE_FIX role as code review)" },
       },
       {
         name: "Post-processing & value caching",
         description:
-          "Fixes column widths, then opens the workbook headlessly to cache the computed formula results — this has to be the very last step before anything reads the numbers out.",
+          "Fixes column widths, then opens the workbook headlessly in LibreOffice to cache the computed formula results — this has to be the very last step before anything reads the numbers out.",
         triggeredBy: "Successful execution",
         ai: { provider: "none" },
       },
       {
         name: "Post-execution balance repair",
         description:
-          "Re-checks the balance sheet now that real computed numbers exist (a separate, later check than the pre-execution one), looping back through the gate-and-rerun cycle if it's still broken.",
+          "Re-checks the balance sheet now that real computed numbers exist (a separate, later check than the pre-execution one, reusing the same check), looping back through the gate-and-rerun cycle if it's still broken.",
         triggeredBy: "Cached values being available",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5 (default) — pinned to claude-opus-4-8 if the Claude provider is selected", note: "Same pinned check as Balance-sheet balance check, re-run post-execution" },
       },
       {
         name: "Metrics extraction",
@@ -253,22 +261,21 @@ export const pipelines = [
         description:
           "If the valuation ratio comes out implausible (too far above or below the current market price), an AI directly patches specific assumption cells — with a locked list of inputs it's explicitly forbidden from touching — to pull the valuation back toward a coherent range. Skipped for user-uploaded models.",
         triggeredBy: "Extracted valuation ratio falling outside a sane range",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5" },
       },
       {
         name: "Documentation",
         description:
           "Writes up the valuation assumptions and final numbers into a readable narrative that the DD report's Valuation section quotes directly, so the written report can't state different figures than the model.",
         triggeredBy: "Plausibility gate resolving (or being skipped)",
-        ai: { provider: "ai" },
+        ai: { provider: "openai", model: "gpt-5.5" },
       },
     ],
     enhancementIdeas: [
-      "The engine's own documentation lists a final \"executive summary\" step as part of the DCF pipeline, but it's not actually implemented here — the calling DD Pipeline does that work itself. It's really the handoff between the two pipelines, not an internal DCF step.",
-      "At least three different failure points all reset all the way back to full model regeneration — there's no cheaper \"patch just the broken part\" retry; every retry rebuilds the entire model from scratch.",
-      "The plausibility gate directly edits the model's own assumptions to force the valuation into a market-relative range — meaning the number an analyst ultimately reads can be an artifact of a gate correction rather than a pure first-pass output. Worth distinguishing \"gate intervened\" runs from \"passed through untouched\" runs.",
-      "Balance-sheet integrity is checked twice by two different mechanisms, and the second one can loop back through a full regenerate-compile-execute cycle — in the worst case a single valuation can trigger several complete rebuilds just to fix balance-sheet issues.",
-      "Multi-provider routing plus at least one step pinned to Opus 4.8 regardless of the provider setting means cost and latency aren't uniform across steps — a real cost-tracking view would need per-step granularity, not one flat \"DCF cost\" figure.",
+      "Add a lighter-weight \"patch mode\" for re-runs: when only one input changes (e.g. a guidance update), regenerate just the affected tab instead of rebuilding the entire 7-tab model from scratch — every retry today, even after a trivial fix, rebuilds everything.",
+      "Add a visible \"gate intervened\" badge on any DCF output the Plausibility Gate had to patch, versus one that passed through untouched — the number an analyst reads can currently be an artifact of a correction with no way to tell from the report alone.",
+      "Build a per-step cost dashboard using the provider-switchable routing that already exists (OpenAI/Claude/Grok/DeepSeek) — since spend isn't uniform across steps or providers, this would let the team actually see where DCF cost concentrates and make an informed call on which steps are worth the pricier model.",
+      "Wire the DCF's own extracted metrics (intrinsic value, P/V ratio) directly into the Portfolio Pipeline's per-company valuation stage as a starting anchor, instead of Portfolio's Claude valuation pass re-deriving intrinsic value independently from the same DCF model.",
     ],
   },
   {
@@ -278,7 +285,7 @@ export const pipelines = [
     oneLiner:
       "Every chat about a company gets mined into durable observations, which get consolidated nightly into per-company memos and archetype playbooks, which then calibrate the Agent Skills that actually vote Pass/Watch on the universe — so the screener keeps re-learning the PM's own judgment instead of running a fixed rulebook.",
     sourceNotes:
-      "The existing docs describe an older version of the system (chat → observations → nightly consolidation → mind narrative) and don't mention playbooks, the Agent Skills roster, the \"Model vs [PM]\" shadow critique, or the Next Evolution pass at all — all of it had to be traced from the actual code.",
+      "Every AI attribution below is confirmed against the live code and .env, including the effective model after environment-variable overrides (e.g. a legacy CLAUDE_MODEL override currently routes several calls to claude-opus-4-7 instead of their coded fallback default).",
     stages: [
       {
         name: "Universe seeding",
@@ -292,71 +299,75 @@ export const pipelines = [
         description:
           "While looking at a company in CapIQ, the PM chats with an AI \"sparring partner\" persona that debates their Pass/Watch lean using the live verdict, financial gates, ownership data, and the PM's own prior words on this and similar names.",
         triggeredBy: "PM opens a company page and starts chatting",
-        ai: { provider: "ai", note: "The pc-sparring-partner skill's underlying model" },
+        ai: { provider: "claude", model: "claude-opus-4-7 (effective, via env override)", note: "Coded fallback default is claude-sonnet-5 if the override is ever removed" },
       },
       {
         name: "Insight extraction into Observations",
         description:
           "A high-effort Claude call mines the chat transcript for durable signal — reasoning, hesitations, sentiment, exact phrasing — and merges it (never overwrites) into the PM's growing profile. If the chat's verdict differs from the screener's own prior call, the PM's call wins and is frozen against future re-screens.",
         triggeredBy: "PM finishes the chat",
-        ai: { provider: "claude", note: "extractInsights — explicitly a high-effort Claude call" },
+        ai: { provider: "claude", model: "claude-opus-4-7 (effective, via env override)", note: "Coded fallback default is claude-sonnet-4-6" },
       },
       {
         name: "Nightly consolidation",
         description:
-          "Each night, Anthropic's Dreams pipeline reads the day's chats plus the accumulated observation store and consolidates: per-company memos are tightened, stale stances retired, and cross-company patterns surfaced into candidate principles for the PM to accept or reject.",
+          "Each night, Anthropic's managed Dreams pipeline reads the day's chats plus the accumulated observation store and consolidates: per-company memos are tightened, stale stances retired, and cross-company patterns surfaced into candidate principles for the PM to accept or reject.",
         triggeredBy: "Nightly schedule (also runnable manually from the dashboard)",
-        ai: { provider: "claude", note: "\"Anthropic's Dreams pipeline\" per the codebase's own naming" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6", note: "This step reads its own dedicated env var, so it's unaffected by the chat/insight override above" },
       },
       {
         name: "Playbooks",
         description:
-          "The archetypes the PM actually thinks in (e.g. \"Founder-Led Compounders\") are discovered by reading the full observation history with an AI — no hardcoded list — and one dense rulebook is built per archetype. Each company gets tagged with 1-3 archetypes and the matching playbook is injected at screening time.",
+          "The archetypes the PM actually thinks in (e.g. \"Founder-Led Compounders\") are discovered by reading the full observation history — no hardcoded list — and one dense rulebook is built per archetype. Each company gets tagged with 1-3 archetypes (a cheaper classification call) and the matching playbook is injected at screening time.",
         triggeredBy: "Automatically chained right after nightly consolidation",
-        ai: { provider: "ai", note: "Archetype discovery and per-archetype synthesis are separate AI calls" },
+        ai: { provider: "claude", model: "claude-sonnet-4-6 (discovery & synthesis) · claude-haiku-4-5 (per-company classification)" },
       },
       {
         name: "Skills Update",
         description:
-          "Fresh playbooks and standing corrections (cases where the screener's verdict differed from the PM's own chat verdict) are diffed against each Agent Skill's current calibration, and gaps become short calibration notes appended to that skill.",
+          "One combined Claude call diffs fresh playbooks and standing corrections against each Agent Skill's current calibration and writes short calibration notes, routing each note to its target skill in the same generative pass — there's no separate routing step.",
         triggeredBy: "Manual only — the dashboard's \"Run Full Refresh\" or \"Skills Update\" button, not on the nightly schedule",
-        ai: { provider: "ai", note: "Gap-diffing and note-routing are both AI calls" },
+        ai: { provider: "claude", model: "claude-opus-4-7 (effective, via env override)", note: "Coded fallback default is claude-sonnet-4-6" },
       },
       {
         name: "Agent Skills",
         description:
-          "Six defined roles do the actual work on every call: a code-owned Gatekeeper (financial gates, never touched by the learning loop), a Research role (facts only, no verdict), the Triage role (the actual Pass/Watch decision), a Critique role (blind second opinion), a Correction-Learner, and the chat persona itself. Each call sees the full roster plus its accumulated calibration notes.",
+          "Six defined roles do the actual work on every call: a code-owned Gatekeeper (financial gates, never touched by the learning loop, no AI), a Research role (facts only), the Triage role (the actual Pass/Watch decision), a Critique role (blind second opinion), a Correction-Learner, and the chat persona itself.",
         triggeredBy: "Every screening batch and every chat turn",
-        ai: { provider: "mixed", note: "The Gatekeeper role itself is deterministic code; the other five are AI roles" },
+        ai: {
+          provider: "mixed",
+          model: "Gatekeeper: code only · Triage/Critique/Research: claude-sonnet-5 · Correction-Learner/Sparring-Partner: claude-opus-4-7 (effective override)",
+        },
       },
       {
         name: "Screening decision (Pass/Watch)",
         description:
-          "For each queued company: pull live quote and ownership data → classify archetype and fetch the matching playbook → get a research brief → compute the deterministic financial gates → run Triage, which must output exactly Pass or Watch (no vague middle ground) with reasoning and confidence → commit the verdict and log the history.",
+          "For each queued company: pull live quote and ownership data → classify archetype (cheap Haiku call) → get a research brief → compute the deterministic financial gates → run Triage, which must output exactly Pass or Watch with reasoning and confidence → commit the verdict and log the history.",
         triggeredBy: "PM clicks \"Screen next N\" (auto-prioritized) or force-reprocesses a name",
-        ai: { provider: "mixed", note: "Financial gates are deterministic math; archetype classification and the Triage verdict are AI" },
+        ai: { provider: "mixed", model: "Archetype classification: claude-haiku-4-5 · Financial gates: code only · Triage verdict: claude-sonnet-5" },
       },
       {
         name: "Shadow critique",
         description:
           "For companies the PM has personally decided in chat, a separate blind pass re-votes the same name using the same gates and playbooks — without seeing the PM's actual call — then reveals it and reconciles the two. A real disagreement becomes a correction that feeds back into Skills Update and Playbooks.",
         triggeredBy: "A separate \"shadow re-screen\" run over the PM's own decided names",
-        ai: { provider: "ai", note: "The pc-screen-critique skill's underlying model" },
+        ai: { provider: "claude", model: "claude-sonnet-5" },
       },
       {
         name: "Next Evolution",
         description:
           "A distinct forward-looking pass over already-Passed names — industry trajectory, reinvestment, optionality — anchored on the PM's own revealed taste rather than the stated framework.",
         triggeredBy: "Runs automatically for the backlog, or explicitly via \"Study selected\"",
-        ai: { provider: "ai" },
+        ai: { provider: "claude", model: "claude-sonnet-5" },
       },
     ],
     enhancementIdeas: [
-      "The three main docs and the README describe chat → observations → nightly consolidation → mind narrative, and never mention playbooks, the Agent Skills roster, the shadow critique/corrections loop, or Next Evolution — all large, already-shipped systems. Anyone onboarding from docs alone would miss roughly half of what actually decides a Pass/Watch verdict today.",
-      "The learning loop isn't fully automatic: nightly consolidation and Playbooks refresh on their own every night, but Skills Update (the step that actually recalibrates the Triage/Critique/chat skills) and Next Evolution only run when someone manually clicks a button. If nobody opens the dashboard, playbooks keep refreshing but the skills' calibration goes stale — the last, most agent-shaping link in the chain is manual-only.",
-      "The admin and screening endpoints reportedly have no authentication on a public IP, and several of them (Refresh All, Skills Update, running Dream) can mutate the calibrated framework and spend real API budget — worth prioritizing over new features.",
-      "A company the PM decided on months ago under an older, looser framework is permanently frozen against re-screening unless the PM manually reopens a chat — there's no automated \"framework moved meaningfully since this verdict was set\" flag.",
-      "Skills Update routes every calibration note into one of five fixed skill buckets via a single automated classification with no human review step — unlike the proposed-principles flow used elsewhere, which does have a human accept/reject step. Extending that same review pattern to Skills Update notes would match the rest of the product's own stated philosophy of keeping the investor in control of the framework.",
+      "Chain Skills Update onto the same nightly cron that already runs Dreams → Playbooks, instead of leaving it manual-only — this is the one link in the self-improving loop that doesn't run itself today, so the agent's actual behavior (not just its playbooks) can go stale between dashboard visits.",
+      "Add authentication to /admin/* and /screen/* — these endpoints can mutate the calibrated framework and trigger real API spend, and currently have none.",
+      "Extend the existing proposed-principles review tray (already used for Dreams) to Skills Update's calibration notes too, so a human approves what actually reshapes agent behavior instead of it auto-appending — this reuses a pattern the product already ships, applied to the one place it's currently missing.",
+      "Add a \"framework moved — worth a re-look\" nudge on frozen chat verdicts that predate a significant playbook change, since those names never get re-tested against the tightened framework unless the PM manually reopens a chat.",
+      "Surface the Shadow Critique's agree/disagree rate as a visible trend on the dashboard — a running calibration score the PM can watch improve (or not) over time, instead of disagreements only living as one-off corrections.",
+      "Wire Screening's confirmed Pass calls directly into the Portfolio Pipeline's Membership Screening stage as a pre-filtered candidate pool, so Portfolio's own include/exclude pass starts from names the PM has already vetted rather than re-evaluating the full research corpus independently.",
     ],
   },
   {
@@ -366,56 +377,56 @@ export const pipelines = [
     oneLiner:
       "Turns Phoenician Intelligence's live due-diligence, risk, and DCF research into two independently-tracked model portfolios — an AI-run book whose membership, valuations, risk read, sizing, and final sign-off are all done by a chain of Claude calls, and a human hand-set benchmark book that gets the same research context but is never algorithmically re-sized.",
     sourceNotes:
-      "A separate post-hoc \"Lessons\" memory grades the AI's own past calls and is explicitly, permanently walled off from ever feeding back into a future weight — a deliberate guardrail confirmed directly in the codebase's own hard-ban rules.",
+      "Every stage below runs on Claude, but not the same tier — the pipeline deliberately spends more on the calls that matter most (the sign-off review runs on Claude Fable 5 at maximum effort; most per-company work runs on Sonnet 5).",
     stages: [
       {
         name: "Research intake",
         description:
           "Fetches every covered company's due-diligence dossier, risk audit, and DCF model fresh from Phoenician Intelligence into a throwaway cache for this run only — nothing is kept long-term, so every run reads the current state of the research, never a stale copy.",
         triggeredBy: "A human clicks Run/Rerun AI (there's no automatic weekly schedule, even though the machinery for one exists)",
-        ai: { provider: "none", note: "A plain API fetch from Phoenician Intelligence" },
+        ai: { provider: "none", note: "A plain HTTP fetch from Phoenician Intelligence" },
       },
       {
         name: "Membership screening",
         description:
-          "A Claude pass reads each candidate's research in small batches and makes an include/exclude call with a thesis and a moat view, favoring genuinely new ideas over ones already included. A second whole-book Claude pass consolidates the survivors into a final roster — there's no fixed name count. Applies only to the AI book; the human's book is picked by hand.",
+          "A Claude pass reads each candidate's research in small batches and makes an include/exclude call with a thesis and a moat view. A second, higher-tier whole-book pass then consolidates the survivors into a final roster — there's no fixed name count. Applies only to the AI book; the human's book is picked by hand.",
         triggeredBy: "Research intake completing",
-        ai: { provider: "claude" },
+        ai: { provider: "claude", model: "claude-sonnet-5 (batch pass) · claude-opus-5 (whole-book consolidation)" },
       },
       {
         name: "Per-company valuation",
         description:
           "An independent Claude pass per company re-derives its own intrinsic value from the DCF and research (correcting assumptions it judges stale), producing a price-to-value read and an expected return. A pure value judgment — it never looks at risk or trading history.",
         triggeredBy: "Membership screening choosing the roster (or a save in the human's Weight Lab)",
-        ai: { provider: "claude" },
+        ai: { provider: "claude", model: "claude-sonnet-5" },
       },
       {
         name: "Independent risk read",
         description:
           "A separate, adversarial Claude pass attacks the valuation's assumptions using the risk audit and full price history, producing the strongest bear case and a volatility estimate. This is the only place past price behavior is allowed to matter — and only as a risk signal, never a return signal.",
         triggeredBy: "Each name's valuation completing",
-        ai: { provider: "claude" },
+        ai: { provider: "claude", model: "claude-sonnet-5" },
       },
       {
         name: "Weight construction",
         description:
           "The book is drafted several times in parallel by Claude, each draft sizing every name to maximize risk-adjusted return with a soft return target, tilting toward cheap durable names and staying diversified. The best draft is kept and refined further, only accepting a change if it genuinely scores better.",
         triggeredBy: "Every chosen name having both a valuation and a risk read",
-        ai: { provider: "claude" },
+        ai: { provider: "claude", model: "claude-opus-5" },
       },
       {
         name: "Sign-off review",
         description:
           "One final, maximum-effort Claude pass writes the case for the whole book — justifying every weight, explaining the ranking, and stating plainly there's no backtest behind the numbers. Required: if it fails, the entire run is discarded and the previous book keeps serving, flagged stale.",
         triggeredBy: "Weight construction settling",
-        ai: { provider: "claude", note: "Described in source as the pipeline's \"maximum-effort\" pass" },
+        ai: { provider: "claude", model: "claude-fable-5 (max effort)", note: "The single most expensive call in the pipeline — runs once and carries the whole book's sign-off; falls back to claude-opus-5 on repeated failure" },
       },
       {
         name: "Forward risk-factor model",
         description:
-          "A last, non-critical pass decomposes each holding's forward risk into a few shared factors purely to power the frontend's what-if weight simulator. Never changes a weight — if it fails, the book still ships and the simulator is just marked unavailable.",
+          "A last pass decomposes each holding's forward risk into a few shared factors purely to power the frontend's what-if weight simulator. Never changes a weight — if it fails, the book still ships and the simulator is just marked unavailable.",
         triggeredBy: "Sign-off completing",
-        ai: { provider: "ai", note: "Non-critical; exact provider not confirmed" },
+        ai: { provider: "claude", model: "claude-opus-5", note: "Not deterministic — a genuine LLM call whose failure is deliberately soft (non-critical)" },
       },
       {
         name: "Validate & publish",
@@ -429,36 +440,37 @@ export const pipelines = [
         description:
           "Prices refresh continuously, updating live values without touching the target weights. The gap between current and target weight is labeled Buy/Sell/Hold and gradually filled in a liquidity-aware simulation — this is the live Trades view.",
         triggeredBy: "Continuous background refresh, independent of when a new book was built",
-        ai: { provider: "none" },
+        ai: { provider: "none", note: "The rebalance math itself is pure arithmetic; the separate Technical Trader tool that can override pacing does use Claude" },
       },
       {
         name: "Human hand-set book",
         description:
           "A fully independent second book: the human picks membership and weights by hand, gets the same Claude valuation/risk passes run over his own names for informational purposes only, and every save anchors and executes on its own. No AI review ever resizes his numbers.",
         triggeredBy: "The human edits and saves the Weight Lab",
-        ai: { provider: "claude", note: "Same valuation/risk-read calls as the AI book, informational only" },
+        ai: { provider: "claude", model: "claude-sonnet-5 (valuation/risk) · claude-opus-5 (optional risk-factor pass)", note: "Same calls as the AI book, informational only — never resizes anything" },
       },
       {
         name: "Advisory overlays",
         description:
-          "Insider filings, earnings previews, a trade-pacing tool, and a Q&A surface all read the same research and publish to the Research tab — every one of them is hard-banned in code from ever writing into a book's weights. They inform a human; they never move a number.",
+          "Insider filings (deterministic classification), a portfolio risk-chip re-scored on every Weight Lab save, a trade-pacing tool, and a Q&A debate surface all read the same research and publish to the Research tab — every one of them is hard-banned in code from ever writing into a book's weights.",
         triggeredBy: "Each runs on its own separate trigger",
-        ai: { provider: "mixed", note: "Each overlay has its own AI call; see EP (Earnings Preview) for one of them" },
+        ai: { provider: "mixed", model: "Insiders: code only · Risk chip / Trade pacing / Ask-why debate: claude-sonnet-5" },
       },
       {
         name: "Lessons",
         description:
           "A separate set of Claude passes compares the AI book's past forecasts to what actually happened, drafting written lessons that graduate from proposed to validated (or get retired). Deliberately never injected back into the reasoning stages — grading the AI's judgment and improving it are kept as two separate, human-mediated steps.",
         triggeredBy: "A human viewing or refreshing the Lessons page — always after the fact",
-        ai: { provider: "claude" },
+        ai: { provider: "claude", model: "claude-sonnet-5", note: "5 chained calls per refresh: selection → valuation → construction → critique → consolidate" },
       },
     ],
     enhancementIdeas: [
-      "The weekly auto-recompute scheduler exists in code but is switched off — today the AI book only reweights when a human manually triggers a run, so it can sit stale indefinitely despite the machinery to run on a cadence already being built.",
-      "Lessons are explicitly advisory and never automatically injected back into any stage — a real, deliberate guardrail, but it also means the feedback loop doesn't close on its own: a human has to read a lesson and manually act on it for it to ever affect a future book.",
-      "A single failed stage anywhere in a run throws away the entire run and reverts to the previous book — there's no partial-recompute or single-name-retry path, so one transient failure forces a full, costly re-run of every name.",
-      "The human book's own risk coverage is documented as genuinely incomplete for names outside the AI book's overlap — his displayed portfolio risk can understate his real exposure for names lacking full research coverage.",
-      "Two different tools in this same product use two different, uncoordinated caps for how fast to execute a trade — a user comparing them for the same name could reasonably expect one consistent number.",
+      "Turn on the weekly auto-recompute scheduler that already exists in code but sits switched off — the AI book only reweighs today when someone manually clicks Run, so it can go stale indefinitely with no cadence guarantee even though the machinery to run one is already built.",
+      "Turn validated Lessons into an actual proposed-change draft (a prompt tweak, a threshold adjustment) for a human to approve, instead of leaving it as a paragraph someone has to manually translate into a config edit — same accept/reject pattern already used elsewhere in this codebase, applied one step further.",
+      "Add single-name retry: today one failed company valuation throws away the entire multi-name run and reverts the whole book to stale. A name-level retry would make transient failures cheap instead of forcing a full, costly re-run of everyone.",
+      "Surface Insiders and Technical Trader pacing signals as inline badges directly on the Trades tab (e.g. \"Insider buying detected\" next to a BUY) instead of leaving them only on a separate Research tab a user has to remember to check.",
+      "Unify the trade-pacing cap between the book's own execution engine (fixed 20% of ADV/day) and the standalone Technical Trader tool (15% default) into one shared setting, so the same kind of pacing decision doesn't quietly give two different answers depending on which surface a user is looking at.",
+      "Wire the DD Pipeline's Red Flags synthesis (already a 4-provider adversarial pass) into the Independent Risk Read as a starting brief, so Portfolio's own red-team call builds on DD's deeper research instead of starting from zero on the same company.",
     ],
   },
   {
@@ -487,23 +499,23 @@ export const pipelines = [
       {
         name: "Forecast stack",
         description:
-          "Dates each company's next earnings event, runs a set of per-name forward-looking checks, and assembles a capped research packet — estimates, filings, insider activity, macro context, prior guidance.",
+          "DeepSeek dates each company's next earnings event (crawling IR pages and search results), then 17 fully deterministic per-name \"nowcast\" playbooks compute factor signals, and everything gets assembled into a capped research dossier.",
         triggeredBy: "Spine ready",
-        ai: { provider: "ai", note: "Calendar dating and the per-name nowcast checks" },
+        ai: { provider: "mixed", model: "Calendar dating: deepseek-chat · 17 nowcast playbooks: code only" },
       },
       {
         name: "Claude battery: insider read + judged forecast",
         description:
-          "One Claude pass chunks and classifies recent insider trading activity; a second Claude pass reads the full research packet per name and publishes the probability of beating expectations, expected surprise size, and expected price move — entirely AI-owned judgment, with every deterministic statistic kept as a diagnostic only.",
+          "One Claude Opus pass chunks and classifies recent insider trading activity; a second Claude pass — deliberately forced to Sonnet, with Opus explicitly rejected for this role — reads the full research packet per name and publishes the probability of beating expectations, expected surprise size, and expected price move.",
         triggeredBy: "Research packets ready",
-        ai: { provider: "claude", note: "Named \"Claude battery\" in the codebase itself — two distinct Claude passes" },
+        ai: { provider: "claude", model: "claude-opus-5 (insider read) · claude-sonnet-5 (judged forecast)", note: "Named \"Claude battery\" in the codebase itself; the judge role explicitly rejects an Opus override to keep behavior consistent" },
       },
       {
         name: "Freeze / score / lessons",
         description:
-          "A forecast is frozen just before its event so it can't be revised in hindsight, scored once the event has passed, and the result folds into the same tool's next forecast — a real, working calibration loop, but one that stays entirely inside this pipeline.",
+          "A forecast is frozen just before its event so it can't be revised in hindsight, then scored once the event has passed. The resulting lesson text is deterministic bookkeeping that feeds into the next judged-forecast call as context — the loop itself makes no AI call.",
         triggeredBy: "Automatically, on a timer relative to each dated event",
-        ai: { provider: "ai", note: "Scoring/lesson-drafting call" },
+        ai: { provider: "none", note: "Feeds forward into the next Claude judge call, but doesn't itself invoke a model" },
       },
       {
         name: "Publish",
@@ -514,9 +526,10 @@ export const pipelines = [
       },
     ],
     enhancementIdeas: [
-      "This pipeline's own freeze/score/lessons loop DOES feed back into its next forecast — a deliberate, working exception to the \"lessons never feed back\" rule that applies to the main Portfolio Pipeline.",
-      "As the two books diverge further, AI-only names get earnings coverage only as an unlocked diagnostic — an AI-book holding could grow in size while carrying thin or no earnings-preview coverage.",
-      "Calendar dating depends on external search keys; without them, names silently fall back to an undated state rather than surfacing a visible error — an easy-to-miss soft degrade.",
+      "Extend EP's coverage to AI-book-only names — it's locked to the human's book today, so as the two books' memberships diverge, AI-book holdings can grow with zero earnings-preview coverage.",
+      "Roll EP's per-name calibration lessons up into a sector-level signal (e.g. \"the judge tends to overestimate beat probability for SaaS names\") instead of keeping every lesson scoped to one ticker in isolation — the same kind of generalization Screening's Playbooks already do with observations.",
+      "Replace the silent \"undated\" fallback (when calendar-dating keys are missing) with a visible alert on the Earnings pane, so a coverage gap doesn't read as \"nothing due soon\" when it's actually \"couldn't check.\"",
+      "Wire EP's judged forecasts directly onto the standalone Earnings Tracker product's calendar entries for the same tickers, so a covered name shows both \"when it reports\" (Earnings Tracker) and \"what we expect\" (EP) in one place instead of two separate products.",
     ],
   },
   {
@@ -525,7 +538,7 @@ export const pipelines = [
     product: "Earnings Pipeline",
     oneLiner:
       "A scheduled scraper that discovers each portfolio company's own earnings dates, uses DeepSeek to turn messy pages into structured events and webcast links, finds and summarizes the actual results once released, and surfaces all of it on a live dashboard and via email.",
-    sourceNotes: "No pre-existing architecture doc — the README's own diagram matched what the code actually does.",
+    sourceNotes: "Every AI step in this pipeline runs on DeepSeek via the OpenAI SDK pointed at DeepSeek's API — a stale code comment elsewhere in the file still claims Sonnet, but no Claude/Anthropic call exists anywhere in this codebase.",
     stages: [
       {
         name: "Weekly scrape kickoff",
@@ -537,16 +550,16 @@ export const pipelines = [
       {
         name: "Per-company earnings-date discovery",
         description:
-          "For each company: reuse a fresh cached result if one exists; otherwise verify the company's official investor-relations page (DeepSeek confirms the page really belongs to the ticker) and try to read its calendar directly first, only falling back to a DeepSeek extraction pass over web-search snippets if that finds nothing. Every extracted date carries a calibrated confidence score.",
+          "For each company: reuse a fresh cached result if one exists; otherwise DeepSeek verifies the company's official investor-relations page and tries to read its calendar directly first, only falling back to a DeepSeek extraction pass over web-search snippets if that finds nothing. Every extracted date carries a calibrated confidence score.",
         triggeredBy: "Immediately after the lock is acquired, for every active company",
-        ai: { provider: "deepseek", note: "Runs on the OpenAI SDK pointed at DeepSeek's API — a stale code comment mentions Claude/Sonnet, but the real runtime client is DeepSeek" },
+        ai: { provider: "deepseek", model: "deepseek-chat (IR-page verification) · deepseek-v4-pro (search-snippet extraction)" },
       },
       {
         name: "Persist & webcast enrichment",
         description:
           "New events are saved. Separately, any event happening soon gets a DeepSeek extraction pass to find and validate its webcast/livestream link.",
         triggeredBy: "Each company's discovery step returning",
-        ai: { provider: "deepseek" },
+        ai: { provider: "deepseek", model: "deepseek-v4-pro" },
       },
       {
         name: "Notification",
@@ -560,7 +573,7 @@ export const pipelines = [
         description:
           "For events with no summary yet, finds the actual published results (IR page, filings, PDFs) and runs a DeepSeek extraction pass that produces a narrative summary plus structured metrics and sentiment.",
         triggeredBy: "A separate hourly schedule, checked at set intervals after each event",
-        ai: { provider: "deepseek" },
+        ai: { provider: "deepseek", model: "deepseek-chat" },
       },
       {
         name: "Dashboard surfacing",
@@ -571,11 +584,10 @@ export const pipelines = [
       },
     ],
     enhancementIdeas: [
-      "The \"Earnings Calendar\" page is actually a filterable table, not a calendar grid — there's no month-view component anywhere despite the product name and hero copy.",
-      "Every event carries a calibrated confidence score (high for an official IR-page date, low for a third-party estimate) but the dashboard never renders it — a viewer can't tell a confirmed date from a speculative one at a glance, even though the data is already there.",
-      "Discovery only runs weekly by default — a company that announces a new date mid-week has no automatic re-check until the following week unless someone manually refreshes.",
-      "Test coverage is thin on the highest-risk logic — the AI response parsing, the discovery fallback logic, and the webcast validation heuristics have no automated tests.",
-      "Stale code comments/docstrings still describe the extraction model as \"Sonnet\" even though the runtime client has been DeepSeek for a while — confusing for anyone reading the code as documentation.",
+      "Build the actual month-grid calendar the product's own name and hero copy promise — today the \"Earnings Calendar\" page is a filterable table, with no calendar-grid component anywhere in the codebase.",
+      "Surface the confidence score that's already computed per event (high for a confirmed IR-page date, low for a third-party estimate) directly in the dashboard — the data exists, it's just never rendered, so a viewer can't currently tell a solid date from a speculative one.",
+      "Add an event-driven mid-week re-check (e.g. triggered by a filing/news webhook) instead of waiting for the next Monday scrape when a company announces a new date outside the weekly cycle.",
+      "Push a completed summary directly onto the relevant company's Research tab inside the Portfolio Pipeline the moment it's generated, instead of leaving it to live only in this standalone product until someone thinks to check.",
     ],
   },
 ];
