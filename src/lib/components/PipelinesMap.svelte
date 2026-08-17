@@ -74,8 +74,8 @@
   // ── Layout: one hull cluster per pipeline, flow-packed onto the shared canvas ──
   const CLUSTER_GAP = 56;
   const WORLD_W = 1720;
-  const NODE_DX = 116;
-  const NODE_DY = 100;
+  const NODE_DX = 168;
+  const NODE_DY = 132;
 
   const clusters = orderedPipelines.map((p) => {
     const n = p.stages.length;
@@ -117,7 +117,7 @@
       allNodes.push({
         id: `${c.pipeline.id}-${i}`,
         name: s.name,
-        shortName: truncate(s.name, 20),
+        shortName: truncate(s.name, 15),
         domain,
         kind: /** @type {import('$lib/ecosystem/types.js').NodeKind} */ ("application"),
         purpose: `AI: ${badgeText(s.ai)} — ${s.description}`,
@@ -136,7 +136,9 @@
         source: `${c.pipeline.id}-${i}`,
         target: `${c.pipeline.id}-${i + 1}`,
         type: /** @type {import('$lib/ecosystem/types.js').EdgeType} */ ("job"),
-        label: c.pipeline.stages[i + 1].name,
+        // Left blank — the target node's own label already shows the stage
+        // name, so an edge label would just duplicate it right on top.
+        label: "",
         description: c.pipeline.stages[i + 1].triggeredBy ?? "",
         confidence: /** @type {import('$lib/ecosystem/types.js').Confidence} */ ("confirmed"),
         evidence: [],
@@ -147,7 +149,6 @@
   const visibleNodes = $derived(allNodes.filter((n) => activeFilters.has(n.domain.replace("pipe-", ""))));
   const visibleNodeIds = $derived(new Set(visibleNodes.map((n) => n.id)));
   const visibleEdges = $derived(allEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)));
-  const visibleEdgeIds = $derived(new Set(visibleEdges.map((e) => e.id)));
 
   /** @type {GalaxyMap|null} */
   let mapRef = $state(null);
@@ -215,10 +216,10 @@
       selectedId={selectedId}
       selectedEdgeId={null}
       highlightNodes={new Set()}
-      highlightEdges={visibleEdgeIds}
+      highlightEdges={new Set()}
       dimUnrelated={false}
       journeyStepIds={[]}
-      animateFlow={true}
+      animateFlow={false}
       onselectnode={onSelectNode}
     />
   </div>
