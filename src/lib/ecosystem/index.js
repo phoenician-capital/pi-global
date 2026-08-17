@@ -37,7 +37,7 @@ export {
 export { businessLayout, lodBand, majorProducts, nodeVisibleAtLod } from "./layout.js";
 export { blastLayers, animateValues } from "./motion.js";
 
-/** @typedef {'architecture'|'project'|'dependency'|'dataflow'|'infra'|'business'|'journey'|'impact'|'intelligence'|'prompts'|'pipeline'} ViewId */
+/** @typedef {'architecture'|'project'|'dependency'|'dataflow'|'infra'|'business'|'journey'|'impact'|'intelligence'|'prompts'|'pipeline'|'pipelines-map'} ViewId */
 
 /** Full view catalog (palette / deep links). Main chrome only shows `primaryViews`. */
 export const views = [
@@ -46,6 +46,7 @@ export const views = [
   { id: "prompts", name: "AI & calls", hint: "Every prompt job, model, and connection type", primary: false },
   { id: "journey", name: "Walkthroughs", hint: "Follow a real workflow step by step", primary: true },
   { id: "pipeline", name: "Pipelines", hint: "How each product's workflow actually runs, stage by stage", primary: true },
+  { id: "pipelines-map", name: "Pipeline Map", hint: "Every pipeline's stages on one filterable map", primary: true },
   { id: "impact", name: "Impact", hint: "What breaks if this piece fails", primary: false },
   { id: "project", name: "Products only", hint: "Hide databases and vendors", primary: false },
   { id: "dependency", name: "Dependencies", hint: "What depends on what", primary: false },

@@ -7,6 +7,7 @@
   import PromptAtlas from "./PromptAtlas.svelte";
   import JourneyRail from "./JourneyRail.svelte";
   import PipelinesDesk from "./PipelinesDesk.svelte";
+  import PipelinesMap from "./PipelinesMap.svelte";
   import {
     blastLayers,
     blastRadius,
@@ -45,8 +46,9 @@
       ? (new URLSearchParams(location.search).get("viewer") || "").trim().toLowerCase()
       : "";
   const canViewPipelines = PIPELINE_ALLOWED_VIEWERS.includes(currentViewer);
+  const PIPELINE_VIEW_IDS = ["pipeline", "pipelines-map"];
 
-  const visiblePrimaryViews = primaryViews.filter((v) => v.id !== "pipeline" || canViewPipelines);
+  const visiblePrimaryViews = primaryViews.filter((v) => !PIPELINE_VIEW_IDS.includes(v.id) || canViewPipelines);
 
   let view = $state(/** @type {ViewId} */ ("intelligence"));
   let selectedId = $state(/** @type {string|null} */ (null));
@@ -486,7 +488,7 @@
 
   function switchView(/** @type {ViewId} */ id) {
     stopPlay();
-    view = id === "pipeline" && !canViewPipelines ? "architecture" : id;
+    view = PIPELINE_VIEW_IDS.includes(id) && !canViewPipelines ? "architecture" : id;
     if (id !== "impact" && id !== "journey") {
       if (id !== "architecture" || !isolate) {
         // keep selection, clear heavy highlights unless focusing
@@ -506,7 +508,7 @@
   }
 </script>
 
-<div class="shell" class:compact={view === "intelligence" || view === "prompts" || view === "pipeline"}>
+<div class="shell" class:compact={view === "intelligence" || view === "prompts" || view === "pipeline" || view === "pipelines-map"}>
   <header class="top">
     <div class="brand">
       <p class="eyebrow">Phoenician Capital · IT</p>
@@ -515,6 +517,8 @@
         <p class="lede">A plain-English guide to every tool we use — pick one on the left to see what it does.</p>
       {:else if view === "pipeline"}
         <p class="lede">How each product's workflow actually runs, stage by stage — and where it could be improved.</p>
+      {:else if view === "pipelines-map"}
+        <p class="lede">Every pipeline's stages in one place — filter by product, pan and zoom to explore.</p>
       {:else if view !== "prompts"}
         <p class="lede">{meta.subtitle}</p>
       {/if}
@@ -570,7 +574,7 @@
 
   <main
     class="stage"
-    class:desk={view === "intelligence" || view === "prompts" || view === "pipeline"}
+    class:desk={view === "intelligence" || view === "prompts" || view === "pipeline" || view === "pipelines-map"}
     class:journey={view === "journey"}
   >
     {#if view === "intelligence"}
@@ -587,6 +591,8 @@
           pipelineId = id;
         }}
       />
+    {:else if view === "pipelines-map"}
+      <PipelinesMap />
     {:else if view === "prompts"}
       <PromptAtlas
         selectedId={selectedId}
