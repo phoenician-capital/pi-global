@@ -145,7 +145,7 @@
       stopPlay();
       if (j?.steps?.[0]) {
         selectedId = j.steps[0];
-        queueMicrotask(() => mapRef?.focusNode(j.steps[0]));
+        queueMicrotask(() => mapRef?.fitSelection());
       }
     }
   });
